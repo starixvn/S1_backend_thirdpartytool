@@ -1,0 +1,34 @@
+﻿using System;
+using System.Collections.Generic;
+using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
+using ThirdPartyTool.Core.DataLayers;
+using ThirdPartyTool.Core.Helpers.Interfaces;
+using ThirdPartyTool.Core.Models;
+
+namespace ThirdPartyTool.Core.ThirdParty
+{
+    public class BaseTpHelper
+    {
+        protected readonly ILogger<BaseTpHelper> Logger;
+        protected readonly IHttpHelper HttpHelper;
+        private readonly MainDbDataLayer _mainDbDataLayer;
+
+        public BaseTpHelper(IServiceProvider provider)
+        {
+            Logger = provider.GetRequiredService<ILogger<BaseTpHelper>>();
+            HttpHelper = provider.GetRequiredService<IHttpHelper>();
+            _mainDbDataLayer = provider.GetRequiredService<MainDbDataLayer>();
+        }
+
+        public IEnumerable<TpCustInfoModel> GeTptAllCustInfoList(int tpId, int siteId)
+        {
+            return _mainDbDataLayer.GetTpAllCustInfoList(tpId, siteId);
+        }
+
+        public IEnumerable<TpCustInfoModel> GetTpAllCustInfoByCust(int tpId, string jsonCustIds)
+        {
+            return _mainDbDataLayer.GetTpAllCustInfoByCust(tpId, jsonCustIds);
+        }
+    }
+}
