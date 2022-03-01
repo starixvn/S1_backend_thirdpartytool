@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using ThirdPartyTool.Core.DataLayers;
+using ThirdPartyTool.Core.Exceptions;
 using ThirdPartyTool.Core.Helpers.Interfaces;
 using ThirdPartyTool.Core.Models;
 
@@ -29,6 +30,26 @@ namespace ThirdPartyTool.Core.ThirdParty
         public IEnumerable<TpCustInfoModel> GetTpAllCustInfoByCust(int tpId, string jsonCustIds)
         {
             return _mainDbDataLayer.GetTpAllCustInfoByCust(tpId, jsonCustIds);
+        }
+
+        public string CreateTpTransferInfo(TpTransferInfo tpTransferInfo)
+        {
+            using var conn = _mainDbDataLayer.GetMySqlConnection();
+
+            conn.Open();
+            var trans = conn.BeginTransaction();
+            var transId = _mainDbDataLayer.CreateTpTransferInfo(tpTransferInfo, trans);
+            if (!string.IsNullOrEmpty(transId))
+            {
+                trans.Commit();
+            }
+            else
+            {
+                trans.Rollback();
+                throw new CustomException("CreateTpTransferInfo return TransId is empty.");
+            }
+
+            return transId;
         }
     }
 }

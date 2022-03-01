@@ -26,7 +26,7 @@ namespace ThirdPartyTool.Core.DataLayers
             _logger = logger;
         }
 
-        public IEnumerable<T> Query<T>(string name, CommandType commandType = CommandType.StoredProcedure, object? parameters = null, int? commandTimeout = null)
+        public IEnumerable<T> Query<T>(string name, CommandType commandType = CommandType.StoredProcedure, object parameters = null, int? commandTimeout = null)
         {
             IEnumerable<T> result;
             var sw = Stopwatch.StartNew();
@@ -46,7 +46,7 @@ namespace ThirdPartyTool.Core.DataLayers
             return result;
         }
 
-        public async Task<IEnumerable<T>> QueryAsync<T>(string name, CommandType commandType = CommandType.StoredProcedure, DynamicParameters? parameters = null, int? commandTimeout = null)
+        public async Task<IEnumerable<T>> QueryAsync<T>(string name, CommandType commandType = CommandType.StoredProcedure, DynamicParameters parameters = null, int? commandTimeout = null)
         {
             IEnumerable<T> result;
             var sw = Stopwatch.StartNew();
@@ -66,7 +66,7 @@ namespace ThirdPartyTool.Core.DataLayers
             return result;
         }
 
-        public async Task<T> QueryFirstAsync<T>(string name, CommandType commandType = CommandType.StoredProcedure, DynamicParameters? parameters = null, int? commandTimeout = null)
+        public async Task<T> QueryFirstAsync<T>(string name, CommandType commandType = CommandType.StoredProcedure, DynamicParameters parameters = null, int? commandTimeout = null)
         {
             T result;
             var resultCode = string.Empty;
@@ -87,7 +87,7 @@ namespace ThirdPartyTool.Core.DataLayers
             return result;
         }
 
-        public async Task<int> ExecuteAsync(string name, CommandType commandType = CommandType.StoredProcedure, object? parameters = null)
+        public async Task<int> ExecuteAsync(string name, CommandType commandType = CommandType.StoredProcedure, object parameters = null)
         {
             var sw = Stopwatch.StartNew();
             int result;
@@ -107,7 +107,7 @@ namespace ThirdPartyTool.Core.DataLayers
             return result;
         }
 
-        public IEnumerable<dynamic> Query(string name, object? parameters = null)
+        public IEnumerable<dynamic> Query(string name, object parameters = null)
         {
             var sw = Stopwatch.StartNew();
             IEnumerable<dynamic> result;
@@ -127,7 +127,7 @@ namespace ThirdPartyTool.Core.DataLayers
             return result;
         }
 
-        public int Execute(string name, IDbTransaction trans, object? parameters = null)
+        public int Execute(string name, IDbTransaction trans, object parameters = null)
         {
             var sw = Stopwatch.StartNew();
             int result;
@@ -146,7 +146,7 @@ namespace ThirdPartyTool.Core.DataLayers
             return result;
         }
 
-        public T QueryFirst<T>(string name, IDbTransaction trans, object? parameters = null)
+        public T QueryFirst<T>(string name, IDbTransaction trans, object parameters = null)
         {
             var sw = Stopwatch.StartNew();
             T result;

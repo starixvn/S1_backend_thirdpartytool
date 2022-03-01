@@ -1,8 +1,10 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using Dapper;
 using Microsoft.Extensions.DependencyInjection;
+using MySql.Data.MySqlClient;
 using ThirdPartyTool.Core.Models;
 using ThirdPartyTool.Core.Models.Enums;
 
@@ -42,6 +44,29 @@ namespace ThirdPartyTool.Core.DataLayers
             parameter.Add("_CustIds", jsonCustIds);
 
             return _dbClient.Query<TpCustInfoModel>("Service_TpCustInfoListByCust_Get", parameters: parameter);
+        }
+
+        public string CreateTpTransferInfo(TpTransferInfo input, IDbTransaction trans)
+        {
+            var parameter = new DynamicParameters();
+            parameter.Add("TpId", input.TpId);
+            parameter.Add("CustId", input.CustId);
+            parameter.Add("UserName", input.UserName);
+            parameter.Add("SiteId", input.SiteId);
+            parameter.Add("Direction", input.Direction);
+            parameter.Add("Amount", input.Amount);
+            parameter.Add("Memo", input.Memo);
+            parameter.Add("ThirdId", input.ThirdId);
+            parameter.Add("Prefix", input.Prefix);
+            parameter.Add("ExtensionInfo", input.ExtensionInfo);
+            parameter.Add("BonusId", input.BonusId);
+
+            return _dbClient.QueryFirst<string>("TpTransferInfo", trans, parameter);
+        }
+
+        public MySqlConnection GetMySqlConnection()
+        {
+            return _dbClient.GetMySqlConnection();
         }
     }
 }

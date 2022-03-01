@@ -45,21 +45,38 @@ namespace ThirdPartyTool.Services
             {
                 switch (action, isSpecific)
                 {
-                    //case ("0", false):
-                    //    foreach (var siteId in _supportSiteIds)
-                    //    {
-                    //        Console.WriteLine($"Start kick users, siteId: {siteId}");
-                    //        var list = _baseTpHelper.GeTptAllCustInfoList(tpId, siteId);
-                    //        KickUsers(list, tpId);
-                    //        Console.WriteLine($"End kick users, siteId: {siteId}");
-                    //    }
-                    //    break;
+                    case ("0", false):
+                        foreach (var siteId in _supportSiteIds)
+                        {
+                            Console.WriteLine($"=== Start kick users, siteId: {siteId} ===");
+                            var list = _baseTpHelper.GeTptAllCustInfoList(tpId, siteId);
+                            KickUsers(list, tpId);
+                            Console.WriteLine($"=== End kick users, siteId: {siteId} ===");
+                        }
+                        break;
 
                     case ("0", true):
-                        var custList = GetSpecificCustInfoList(tpId);
-                        Console.WriteLine("= Start kick specific users =");
-                        KickUsers(custList, tpId);
-                        Console.WriteLine("End kick specific users");
+                        var custListForKick = GetSpecificCustInfoList(tpId);
+                        Console.WriteLine("=== Start kick specific users ===");
+                        KickUsers(custListForKick, tpId);
+                        Console.WriteLine("=== End kick specific users ===");
+                        break;
+
+                    case ("1", false):
+                        foreach (var siteId in _supportSiteIds)
+                        {
+                            Console.WriteLine($"=== Start transfer back, siteId: {siteId} ===");
+                            var list = _baseTpHelper.GeTptAllCustInfoList(tpId, siteId);
+                            //KickUsers(list, tpId);
+                            Console.WriteLine($"=== End transfer back, siteId: {siteId} ===");
+                        }
+                        break;
+
+                    case ("1", true):
+                        var custListForTransfer = GetSpecificCustInfoList(tpId);
+                        Console.WriteLine("=== Start transfer back for specific users ===");
+                        //KickUsers(custListForTransfer, tpId);
+                        Console.WriteLine("=== End transfer back for specific users ===");
                         break;
 
                     default:
@@ -79,12 +96,19 @@ namespace ThirdPartyTool.Services
             return Task.CompletedTask;
         }
 
-        private void PrintMenu()
+        private void TransferBack(IEnumerable<TpCustInfoModel> custInfoList, int tpId)
+        {
+            var tpHelper = _tpHandler[tpId];
+            var result = tpHelper.ParallelTransferBack(custInfoList, 1); // todo: task count => config setting
+            // todo: write to file
+        }
+
+
+        private static void PrintMenu()
         {
             Console.WriteLine("================= Menu =================");
             Console.WriteLine("\t 0: Kick users");
             Console.WriteLine("\t 1: Transfer back");
-            Console.WriteLine("\t 3: Kick users and transfer back");
             Console.WriteLine("\t -1: Exit");
             Console.WriteLine("========================================");
         }
@@ -109,7 +133,7 @@ namespace ThirdPartyTool.Services
             }
         }
 
-        private string ReadStringFromInputFilePath()
+        private static string ReadStringFromInputFilePath()
         {
             Console.WriteLine("Enter the file path:");
             var filePath = Console.ReadLine();
@@ -140,7 +164,7 @@ namespace ThirdPartyTool.Services
             return tpId;
         }
 
-        private bool GetIsSpecific()
+        private static bool GetIsSpecific()
         {
             Console.WriteLine("0: All users , 1: Specific users");
             var strIsSpecific = Console.ReadLine();
@@ -154,7 +178,7 @@ namespace ThirdPartyTool.Services
             return strIsSpecific == "1";
         }
 
-        private IEnumerable<string> GetSplitList(string str)
+        private static IEnumerable<string> GetSplitList(string str)
         {
             return str
                 .Replace(" ", string.Empty)
@@ -163,14 +187,10 @@ namespace ThirdPartyTool.Services
                 .Distinct();
         }
 
-        private void WriteToFile(string fileName, string str)
+        private static void WriteToFile(string fileName, string str)
         {
             Directory.CreateDirectory(Path);
             File.WriteAllText($"{Path}/{fileName}", str);
-            /*using (StreamWriter sw = File.CreateText($"{Path}/{fileName}"))
-            {
-                sw.WriteLine(str);
-            }*/
         }
     }
 }
