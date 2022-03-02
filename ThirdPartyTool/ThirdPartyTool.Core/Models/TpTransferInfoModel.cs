@@ -1,10 +1,6 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Text;
-
-namespace ThirdPartyTool.Core.Models
+﻿namespace ThirdPartyTool.Core.Models
 {
-    public class TpTransferInfo
+    public class TpTransferInfoModel
     {
         public int TpId { get; set; }
         public int CustId { get; set; }

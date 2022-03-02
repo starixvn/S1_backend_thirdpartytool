@@ -53,7 +53,7 @@ namespace ThirdPartyTool.Core.ThirdParty
             return failedList;
         }
 
-        public (IEnumerable<TransferBackFailedRecord> FailedRecord, IEnumerable<TransferRemainRecord> RemainRecord) ParallelTransferBack(
+        public (IEnumerable<TransferBackFailedRecord> FailedRecords, IEnumerable<TransferRemainRecord> RemainRecords) ParallelTransferBack(
             IEnumerable<TpCustInfoModel> todoList, int taskCount)
         {
             var failedList = new List<TransferBackFailedRecord>();
@@ -77,7 +77,7 @@ namespace ThirdPartyTool.Core.ThirdParty
                             _ = UpdateMemberAsync(tpCustInfo.TpUserName, tpCustInfo.SiteId).Result;
                         }
 
-                        var tpTransferInfo = new TpTransferInfo
+                        var tpTransferInfo = new TpTransferInfoModel
                         {
                             TpId = tpCustInfo.TpId,
                             CustId = tpCustInfo.CustId,
@@ -107,11 +107,14 @@ namespace ThirdPartyTool.Core.ThirdParty
                         {
                             remainList.Add(new TransferRemainRecord
                             {
+                                SiteId = tpCustInfo.SiteId,
                                 CustId = tpCustInfo.CustId,
                                 UserName = tpCustInfo.UserName,
                                 RemainAmount = result.RespData.AfterAmount
                             });
                         }
+
+                        // todo: call bonus sp? and add money to wallet
                     }
                     catch (Exception ex)
                     {
@@ -128,7 +131,102 @@ namespace ThirdPartyTool.Core.ThirdParty
             return (failedList, remainList);
         }
 
-        public async Task<bool> KickUserAsync(TpCustInfoModel tpCustInfo)
+        public (IEnumerable<TransferBackFailedRecord> FailedRecords, IEnumerable<TransferRemainRecord> RemainRecords) ParallelTransferRetry(
+            IEnumerable<TransferBackRetryModel> todoList, int taskCount)
+        {
+            var failedList = new List<TransferBackFailedRecord>();
+            var remainList = new List<TransferRemainRecord>();
+
+            Parallel.ForEach(todoList,
+                new ParallelOptions() { MaxDegreeOfParallelism = taskCount },
+                retryItem =>
+                {
+                    var transId = string.Empty;
+                    try
+                    {
+                        if (!string.IsNullOrEmpty(retryItem.TransId))
+                        {
+                            var transferStatus = CheckFundTransferAsync(retryItem.TransId, retryItem.TpCustInfo.SiteId).Result;
+                            // todo: check transfer
+                            switch (transferStatus)
+                            {
+                                case TransferStatus.Success:
+                                    // todo: commit?
+                                    break;
+                                case TransferStatus.Failed:
+                                    // todo: commit and trans new
+                                    break;
+                                case TransferStatus.Pending:
+                                    // todo: add to failed list
+                                    return;
+                            }
+                        }
+
+
+                       /* var tpBalanceInfo = CheckUserBalanceAsync(retryItem).Result;
+
+                        if (tpBalanceInfo.Balance <= 0)
+                            return;
+
+                        // if balance < 1, update user min transfer limit
+                        if (tpBalanceInfo.Balance < 1)
+                        {
+                            _ = UpdateMemberAsync(retryItem.TpUserName, retryItem.SiteId).Result;
+                        }
+
+                        var tpTransferInfo = new TpTransferInfoModel
+                        {
+                            TpId = retryItem.TpId,
+                            CustId = retryItem.CustId,
+                            SiteId = retryItem.SiteId,
+                            UserName = tpBalanceInfo.TpUserName,
+                            Amount = tpBalanceInfo.Balance,
+                            Prefix = TransferPrefix.FT.ToString(),
+                            Direction = (int)Direction.ToMain,
+                            Memo = "system force transfer: switch to seamless wallet",
+                            ThirdId = null,
+                            ExtensionInfo = JsonConvert.SerializeObject(tpBalanceInfo) // todo: 看有沒有要改，先暫時這樣
+                        };
+
+                        transId = base.CreateTpTransferInfo(tpTransferInfo);
+                        var result = FundTransferAsync(retryItem, tpTransferInfo, transId).Result;
+
+                        if (result.Status != TransferStatus.Success)
+                            failedList.Add(new TransferBackFailedRecord
+                            {
+                                CustId = retryItem.CustId,
+                                TransId = transId,
+                                Message = result.Status.ToString()
+                            });
+
+                        // 有殘餘轉不乾淨的金額
+                        if (result.RespData.AfterAmount > 0)
+                        {
+                            remainList.Add(new TransferRemainRecord
+                            {
+                                SiteId = retryItem.SiteId,
+                                CustId = retryItem.CustId,
+                                UserName = retryItem.UserName,
+                                RemainAmount = result.RespData.AfterAmount
+                            });
+                        }*/
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError(ex, ex.Message);
+                        failedList.Add(new TransferBackFailedRecord
+                        {
+                            CustId = retryItem.CustId,
+                            TransId = transId,
+                            Message = ex.Message
+                        });
+                    }
+                });
+
+            return (failedList, remainList);
+        }
+
+        private async Task<bool> KickUserAsync(TpCustInfoModel tpCustInfo)
         {
             var tpSetting = GetThirdPartyModel(tpCustInfo.SiteId).TpSetting;
             var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.KickUser;
@@ -148,7 +246,7 @@ namespace ThirdPartyTool.Core.ThirdParty
             }
 
             var result = response.Result;
-            if (!SabaDefinition.GetKickUserResult(result.ErrorCode))
+            if (!SabaDefinition.KickUserSuccess(result.ErrorCode))
             {
                 throw new CustomException(
                     $"Saba KickUser failed: ({result.ErrorCode}) {result.Message}");
@@ -156,8 +254,8 @@ namespace ThirdPartyTool.Core.ThirdParty
 
             return true;
         }
-
-        public async Task<CheckUserBalanceData> CheckUserBalanceAsync(TpCustInfoModel tpCustInfo)
+        
+        private async Task<CheckUserBalanceData> CheckUserBalanceAsync(TpCustInfoModel tpCustInfo)
         {
             var tpSetting = GetThirdPartyModel(tpCustInfo.SiteId).TpSetting;
             var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.CheckUserBalance;
@@ -178,16 +276,16 @@ namespace ThirdPartyTool.Core.ThirdParty
             }
 
             var result = response.Result;
-            if (!SabaDefinition.CommonBalanceResult(result.ErrorCode))
+            if (!SabaDefinition.SabaCommonSuccess(result.ErrorCode))
             {
                 throw new CustomException(
                     $"Saba CheckUserBalanceData failed: ({result.ErrorCode}) {result.Message}");
             }
 
-            return result.Data;
+            return result.Data.FirstOrDefault();
         }
 
-        public async Task<(TransferStatus Status, FundTransferRespData RespData)> FundTransferAsync(TpCustInfoModel tpCustInfo, TpTransferInfo tpTransferInfo, string transId)
+        private async Task<(TransferStatus Status, FundTransferRespData RespData)> FundTransferAsync(TpCustInfoModel tpCustInfo, TpTransferInfoModel tpTransferInfo, string transId)
         {
             var tpSetting = GetThirdPartyModel(tpCustInfo.SiteId).TpSetting;
             var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.FundTransfer;
@@ -212,7 +310,7 @@ namespace ThirdPartyTool.Core.ThirdParty
             }
 
             var result = response.Result;
-            if (!SabaDefinition.CommonBalanceResult(result.ErrorCode))
+            if (!SabaDefinition.SabaCommonSuccess(result.ErrorCode))
             {
                 throw new CustomException(
                     $"Saba FundTransfer failed: ({result.ErrorCode}) {result.Message}");
@@ -223,7 +321,7 @@ namespace ThirdPartyTool.Core.ThirdParty
             return (status, result.Data);
         }
 
-        public async Task<TransferStatus> CheckFundTransferAsync(string transId, int siteId)
+        private async Task<TransferStatus> CheckFundTransferAsync(string transId, int siteId)
         {
             var tpSetting = GetThirdPartyModel(siteId).TpSetting;
             var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.CheckFundTransfer;
@@ -254,7 +352,7 @@ namespace ThirdPartyTool.Core.ThirdParty
             return status;
         }
 
-        public async Task<bool> UpdateMemberAsync(string tpUserName, int siteId)
+        private async Task<bool> UpdateMemberAsync(string tpUserName, int siteId)
         {
             var tpSetting = GetThirdPartyModel(siteId).TpSetting;
             var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.CheckFundTransfer;
@@ -276,7 +374,7 @@ namespace ThirdPartyTool.Core.ThirdParty
             }
 
             var result = response.Result;
-            if (!SabaDefinition.CommonBalanceResult(result.ErrorCode))
+            if (!SabaDefinition.SabaCommonSuccess(result.ErrorCode))
             {
                 throw new CustomException(
                     $"Saba UpdateMember failed: ({result.ErrorCode}) {result.Message}");

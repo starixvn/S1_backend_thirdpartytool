@@ -10,5 +10,8 @@ namespace ThirdPartyTool.Core.ThirdParty.Interfaces
         int TpId { get; }
 
         IEnumerable<int> ParallelKickUsers(IEnumerable<TpCustInfoModel> todoList, int taskCount);
+
+        (IEnumerable<TransferBackFailedRecord> FailedRecords, IEnumerable<TransferRemainRecord> RemainRecords)
+            ParallelTransferBack(IEnumerable<TpCustInfoModel> todoList, int taskCount);
     }
 }

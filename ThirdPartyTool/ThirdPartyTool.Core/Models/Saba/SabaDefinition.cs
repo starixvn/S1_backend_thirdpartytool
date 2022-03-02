@@ -7,7 +7,7 @@ namespace ThirdPartyTool.Core.Models.Saba
     {
         public const string SabaSuccessCode = "0";
 
-        public static bool GetKickUserResult(string errorCode) =>
+        public static bool KickUserSuccess(string errorCode) =>
             errorCode switch
             {
                 SabaSuccessCode => true,
@@ -27,17 +27,22 @@ namespace ThirdPartyTool.Core.Models.Saba
         {
             return errorCode switch
             {
-                "0" => GetTransferStatus(status),
-                "2" => TransferStatus.Failed,
+                SabaSuccessCode => GetTransferStatus(status),
+                "2" => TransferStatus.Failed, // 會員不存在
                 _ => TransferStatus.Pending
             };
         }
 
         public static IEnumerable<string> CheckTransferErrorErrorCode
-            => new List<string> {"1", "7", "9"};
+            => new List<string>
+            {
+                "1", // 執行過程中失敗
+                "7", // wallet_id 錯誤
+                "9" // 廠商識別碼錯誤
+            };
 
-        public static bool CommonBalanceResult(string errorCode) =>
-            errorCode != SabaSuccessCode;
+        public static bool SabaCommonSuccess(string errorCode) =>
+            errorCode == SabaSuccessCode;
     }
 
 

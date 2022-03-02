@@ -1,10 +1,11 @@
-﻿using Newtonsoft.Json;
+﻿using System.Collections.Generic;
+using Newtonsoft.Json;
 
 namespace ThirdPartyTool.Core.Models.Saba
 {
     public class CheckUserBalanceResp : SabaBaseResp
     {
-        public CheckUserBalanceData Data { get; set; }
+        public IEnumerable<CheckUserBalanceData> Data { get; set; }
     }
 
     public class CheckUserBalanceData

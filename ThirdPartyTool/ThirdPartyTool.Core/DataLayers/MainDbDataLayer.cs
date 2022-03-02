@@ -46,7 +46,7 @@ namespace ThirdPartyTool.Core.DataLayers
             return _dbClient.Query<TpCustInfoModel>("Service_TpCustInfoListByCust_Get", parameters: parameter);
         }
 
-        public string CreateTpTransferInfo(TpTransferInfo input, IDbTransaction trans)
+        public string CreateTpTransferInfo(TpTransferInfoModel input, IDbTransaction trans)
         {
             var parameter = new DynamicParameters();
             parameter.Add("TpId", input.TpId);
@@ -62,6 +62,36 @@ namespace ThirdPartyTool.Core.DataLayers
             parameter.Add("BonusId", input.BonusId);
 
             return _dbClient.QueryFirst<string>("TpTransferInfo", trans, parameter);
+        }
+
+        public bool SetTpTransferInfo(SetTpTransferInfoModel input, IDbTransaction trans)
+        {
+            var parameter = new DynamicParameters();
+            parameter.Add("TransferId", input.TransferId);
+            parameter.Add("ThirdId", input.ThirdId);
+            parameter.Add("Memo", input.Memo);
+            parameter.Add("ForStatus", (int)input.ForStatus);
+            parameter.Add("Status", (int)input.Status);
+
+            return _dbClient.Execute("TpTransferInfo", trans, parameter) > 0;
+        }
+
+        public (bool Success, decimal AfterAmount) SetWalletBalance(SetWalletBalanceModel input, IDbTransaction trans)
+        {
+            var parameter = new DynamicParameters();
+            parameter.Add("CustId", input.CustId);
+            parameter.Add("UserName", input.UserName);
+            parameter.Add("SiteId", input.SiteId);
+            parameter.Add("Amount", input.Amount);
+            parameter.Add("TYPE", input.Type);
+            parameter.Add("RefTransId", input.RefTransId);
+            parameter.Add("Is1stDepoist", dbType: DbType.Byte, direction: ParameterDirection.Output);
+            parameter.Add("AfterAmount", dbType: DbType.Decimal, direction: ParameterDirection.Output);
+
+            var success = _dbClient.Execute("Wallet_Set", trans, parameter) > 0;
+            var afterAmount = success ? parameter.Get<decimal>("AfterAmount") : 0;
+
+            return (success, afterAmount);
         }
 
         public MySqlConnection GetMySqlConnection()

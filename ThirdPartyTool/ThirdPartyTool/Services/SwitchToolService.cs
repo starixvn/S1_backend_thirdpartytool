@@ -67,7 +67,7 @@ namespace ThirdPartyTool.Services
                         {
                             Console.WriteLine($"=== Start transfer back, siteId: {siteId} ===");
                             var list = _baseTpHelper.GeTptAllCustInfoList(tpId, siteId);
-                            //KickUsers(list, tpId);
+                            TransferBack(list, tpId);
                             Console.WriteLine($"=== End transfer back, siteId: {siteId} ===");
                         }
                         break;
@@ -75,7 +75,15 @@ namespace ThirdPartyTool.Services
                     case ("1", true):
                         var custListForTransfer = GetSpecificCustInfoList(tpId);
                         Console.WriteLine("=== Start transfer back for specific users ===");
-                        //KickUsers(custListForTransfer, tpId);
+                        TransferBack(custListForTransfer, tpId);
+                        Console.WriteLine("=== End transfer back for specific users ===");
+                        break;
+
+                    case ("2", true):
+                        var retryList = GetTransferBackRetryList().ToList();
+                        var jsonCustIds = JsonConvert.SerializeObject(retryList.Select(x => x.CustId));
+                        Console.WriteLine("=== Start transfer back for specific users ===");
+                        //TransferBack(custListForTransfer, tpId);
                         Console.WriteLine("=== End transfer back for specific users ===");
                         break;
 
@@ -100,7 +108,27 @@ namespace ThirdPartyTool.Services
         {
             var tpHelper = _tpHandler[tpId];
             var result = tpHelper.ParallelTransferBack(custInfoList, 1); // todo: task count => config setting
-            // todo: write to file
+            var failedList = result.FailedRecords.ToList();
+            var remainList = result.RemainRecords.ToList();
+
+            if (failedList.Any())
+            {
+                var fileName = $"transfer_failed_{DateTime.Now:yyyyMMddHHmmss}.txt";
+                var str = string.Join(Environment.NewLine,
+                        failedList.Select(x => $"{x.CustId}|{x.TransId}|{x.Message}"));
+
+                WriteToFile(fileName, str);
+            }
+
+            if (remainList.Any())
+            {
+                var fileName = $"transfer_remain_{DateTime.Now:yyyyMMddHHmmss}.csv";
+                var str = $"SiteId,CustId,UserName,RemainAmount{Environment.NewLine}" +
+                    string.Join(Environment.NewLine,
+                        remainList.Select(x => $"{x.SiteId},{x.CustId},{x.UserName},{x.RemainAmount}"));
+
+                WriteToFile(fileName, str);
+            }
         }
 
 
@@ -109,6 +137,7 @@ namespace ThirdPartyTool.Services
             Console.WriteLine("================= Menu =================");
             Console.WriteLine("\t 0: Kick users");
             Console.WriteLine("\t 1: Transfer back");
+            Console.WriteLine("\t 2: Transfer back failed list retry");
             Console.WriteLine("\t -1: Exit");
             Console.WriteLine("========================================");
         }
@@ -119,6 +148,23 @@ namespace ThirdPartyTool.Services
             var custIdList = GetSplitList(strCustIds);
             var jsonCustIds = JsonConvert.SerializeObject(custIdList);
             return _baseTpHelper.GetTpAllCustInfoByCust(tpId, jsonCustIds);
+        }
+
+        private IEnumerable<TransferBackRetryModel> GetTransferBackRetryList()
+        {
+            var strRecords = ReadStringFromInputFilePath();
+            var records = strRecords.Split(Environment.NewLine)
+                .Select(x =>
+                {
+                    var item = x.Split('|');
+                    return new TransferBackRetryModel
+                    {
+                        CustId = int.Parse(item[0]),
+                        TransId = item[1]
+                    };
+                });
+
+            return records;
         }
 
         private void KickUsers(IEnumerable<TpCustInfoModel> custInfoList, int tpId)

@@ -32,7 +32,7 @@ namespace ThirdPartyTool.Core.ThirdParty
             return _mainDbDataLayer.GetTpAllCustInfoByCust(tpId, jsonCustIds);
         }
 
-        public string CreateTpTransferInfo(TpTransferInfo tpTransferInfo)
+        public string CreateTpTransferInfo(TpTransferInfoModel tpTransferInfo)
         {
             using var conn = _mainDbDataLayer.GetMySqlConnection();
 
@@ -50,6 +50,40 @@ namespace ThirdPartyTool.Core.ThirdParty
             }
 
             return transId;
+        }
+
+        public bool CommitTpTransfer(SetTpTransferInfoModel tpTransferInfo, SetWalletBalanceModel setWalletBalance)
+        {
+            using var conn = _mainDbDataLayer.GetMySqlConnection();
+
+            conn.Open();
+            var trans = conn.BeginTransaction();
+            var setTransferSuccess = _mainDbDataLayer.SetTpTransferInfo(tpTransferInfo, trans);
+            if (setTransferSuccess)
+            {
+
+                var setWalletResult = _mainDbDataLayer.SetWalletBalance(setWalletBalance, trans);
+                if (setWalletResult.Success)
+                {
+                    trans.Commit();
+                    Logger.LogInformation(
+                        $"{setWalletBalance.CustId} {setWalletBalance.UserName} AfterAmount: {setWalletResult.AfterAmount}");
+                }
+                else
+                {
+                    trans.Rollback();
+                    throw new CustomException(
+                        $"TransferId: {tpTransferInfo.TransferId}, CustId:{setWalletBalance.CustId}, SetWalletBalance failed.");
+                }
+            }
+            else
+            {
+                trans.Rollback();
+                throw new CustomException(
+                    $"TransferId: {tpTransferInfo.TransferId}, CustId:{setWalletBalance.CustId} SetTpTransferInfo failed.");
+            }
+
+            return true;
         }
     }
 }
