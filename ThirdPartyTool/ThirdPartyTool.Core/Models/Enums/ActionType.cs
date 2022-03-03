@@ -1,8 +1,21 @@
-﻿namespace ThirdPartyTool.Core.Models.Enums
+﻿using System.ComponentModel;
+
+namespace ThirdPartyTool.Core.Models.Enums
 {
     public enum ActionType
     {
-        KickUser = 0,
-        TransferIn = 1
+        [Description("Kick users")]
+        KickUsers = 0,
+
+        [Description("Transfer back")]
+        TransferBack = 1,
+
+        [Description("Transfer retry")]
+        TransferRetry = 2,
+
+        [Description("Exit")]
+        Exit = -1,
+
+        Undefined = -9
     }
 }

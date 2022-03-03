@@ -13,6 +13,7 @@ namespace ThirdPartyTool.Core.DataLayers
     public class MainDbDataLayer
     {
         private readonly MySqlClient _dbClient;
+        private const int TypePosition = 2000;
 
         public MainDbDataLayer(IServiceProvider provider)
         {
@@ -83,7 +84,7 @@ namespace ThirdPartyTool.Core.DataLayers
             parameter.Add("UserName", input.UserName);
             parameter.Add("SiteId", input.SiteId);
             parameter.Add("Amount", input.Amount);
-            parameter.Add("TYPE", input.Type);
+            parameter.Add("TYPE", TypePosition + input.TpId);
             parameter.Add("RefTransId", input.RefTransId);
             parameter.Add("Is1stDepoist", dbType: DbType.Byte, direction: ParameterDirection.Output);
             parameter.Add("AfterAmount", dbType: DbType.Decimal, direction: ParameterDirection.Output);
@@ -92,6 +93,15 @@ namespace ThirdPartyTool.Core.DataLayers
             var afterAmount = success ? parameter.Get<decimal>("AfterAmount") : 0;
 
             return (success, afterAmount);
+        }
+
+        public decimal SetSabaBonus(int custId, string transId, IDbTransaction trans)
+        {
+            var parameter = new DynamicParameters();
+            parameter.Add("CustId", custId);
+            parameter.Add("TransId", transId);
+
+            return _dbClient.QueryFirst<decimal>("Service_SabaBonus_Set", trans, parameter);
         }
 
         public MySqlConnection GetMySqlConnection()

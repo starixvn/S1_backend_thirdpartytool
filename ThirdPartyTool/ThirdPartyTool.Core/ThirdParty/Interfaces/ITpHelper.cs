@@ -13,5 +13,8 @@ namespace ThirdPartyTool.Core.ThirdParty.Interfaces
 
         (IEnumerable<TransferBackFailedRecord> FailedRecords, IEnumerable<TransferRemainRecord> RemainRecords)
             ParallelTransferBack(IEnumerable<TpCustInfoModel> todoList, int taskCount);
+
+        (IEnumerable<TransferBackFailedRecord> FailedRecords, IEnumerable<TransferRemainRecord> RemainRecords)
+            ParallelTransferRetry(IEnumerable<TransferBackRetryModel> todoList, int taskCount);
     }
 }

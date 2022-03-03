@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using System.Threading.Tasks;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
@@ -24,7 +25,8 @@ namespace ThirdPartyTool.Core.ThirdParty
         public SabaTpHelper(IServiceProvider provider) : base(provider)
         {
             _thirdPartyModel = provider.GetRequiredService<IEnumerable<ThirdPartyModel>>()
-                .Where(item => item.TpId == TpId).ToDictionary(item => item.SiteId, item => item);
+                .Where(item => item.TpId == TpId)
+                .ToDictionary(item => item.SiteId, item => item);
 
         }
 
@@ -66,55 +68,53 @@ namespace ThirdPartyTool.Core.ThirdParty
                     var transId = string.Empty;
                     try
                     {
+                        // Step 1: 取得沙巴餘額
                         var tpBalanceInfo = CheckUserBalanceAsync(tpCustInfo).Result;
 
                         if (tpBalanceInfo.Balance <= 0)
                             return;
 
-                        // if balance < 1, update user min transfer limit
+                        // Step 2: 餘額 < 1 時調整轉帳下限
                         if (tpBalanceInfo.Balance < 1)
                         {
-                            _ = UpdateMemberAsync(tpCustInfo.TpUserName, tpCustInfo.SiteId).Result;
+                            _ = UpdateMemberAsync(tpCustInfo, tpCustInfo.SiteId).Result;
                         }
 
-                        var tpTransferInfo = new TpTransferInfoModel
-                        {
-                            TpId = tpCustInfo.TpId,
-                            CustId = tpCustInfo.CustId,
-                            SiteId = tpCustInfo.SiteId,
-                            UserName = tpBalanceInfo.TpUserName,
-                            Amount = tpBalanceInfo.Balance,
-                            Prefix = TransferPrefix.FT.ToString(),
-                            Direction = (int)Direction.ToMain,
-                            Memo = "system force transfer: switch to seamless wallet",
-                            ThirdId = null,
-                            ExtensionInfo = JsonConvert.SerializeObject(tpBalanceInfo) // todo: 看有沒有要改，先暫時這樣
-                        };
-
+                        // Step 3: 轉回沙巴餘額
+                        var transferAmount = ToOurAmount(tpBalanceInfo.Balance, tpCustInfo.ExchangeRate);
+                        var jsonTpBalanceInfo = JsonConvert.SerializeObject(tpBalanceInfo);
+                        var tpTransferInfo = new TpTransferInfoModel(tpCustInfo, transferAmount, jsonTpBalanceInfo);
+                        
                         transId = base.CreateTpTransferInfo(tpTransferInfo);
-                        var result = FundTransferAsync(tpCustInfo, tpTransferInfo, transId).Result;
-
-                        if (result.Status != TransferStatus.Success)
-                            failedList.Add(new TransferBackFailedRecord
-                            {
-                                CustId = tpCustInfo.CustId,
-                                TransId = transId,
-                                Message = result.Status.ToString()
-                            });
+                        var (status, respData) = FundTransferAsync(tpCustInfo, tpTransferInfo, transId).Result;
 
                         // 有殘餘轉不乾淨的金額
-                        if (result.RespData.AfterAmount > 0)
+                        if (respData.AfterAmount > 0)
                         {
                             remainList.Add(new TransferRemainRecord
                             {
                                 SiteId = tpCustInfo.SiteId,
                                 CustId = tpCustInfo.CustId,
                                 UserName = tpCustInfo.UserName,
-                                RemainAmount = result.RespData.AfterAmount
+                                RemainAmount = ToOurAmount(respData.AfterAmount, tpCustInfo.ExchangeRate)
                             });
                         }
 
-                        // todo: call bonus sp? and add money to wallet
+                        // 轉帳失敗不 Commit，Retry 檢查單號的時候再做
+                        if (status != TransferStatus.Success)
+                        {
+                            failedList.Add(new TransferBackFailedRecord
+                            {
+                                CustId = tpCustInfo.CustId,
+                                TransId = transId,
+                                Message = status.ToString()
+                            });
+
+                            return;
+                        }
+                        
+                        // Step 4: 更新轉帳結果
+                        CommitTransfer(tpCustInfo, transId, transferAmount, status, respData.TransId);
                     }
                     catch (Exception ex)
                     {
@@ -130,7 +130,7 @@ namespace ThirdPartyTool.Core.ThirdParty
 
             return (failedList, remainList);
         }
-
+        
         public (IEnumerable<TransferBackFailedRecord> FailedRecords, IEnumerable<TransferRemainRecord> RemainRecords) ParallelTransferRetry(
             IEnumerable<TransferBackRetryModel> todoList, int taskCount)
         {
@@ -142,74 +142,81 @@ namespace ThirdPartyTool.Core.ThirdParty
                 retryItem =>
                 {
                     var transId = string.Empty;
+                    var tpCustInfo = retryItem.TpCustInfo;
+                    var transferAmount = 0m;
                     try
                     {
                         if (!string.IsNullOrEmpty(retryItem.TransId))
                         {
-                            var transferStatus = CheckFundTransferAsync(retryItem.TransId, retryItem.TpCustInfo.SiteId).Result;
-                            // todo: check transfer
-                            switch (transferStatus)
+                            var checkResult = CheckFundTransferAsync(retryItem.TransId, tpCustInfo.SiteId).Result;
+                            
+                            switch (checkResult.Status)
                             {
                                 case TransferStatus.Success:
-                                    // todo: commit?
-                                    break;
+                                    transferAmount = ToOurAmount(checkResult.RespData.Amount, this.TpId);
+                                    CommitTransfer(tpCustInfo, retryItem.TransId, transferAmount, checkResult.Status, checkResult.RespData.TransId);
+                                    return;
                                 case TransferStatus.Failed:
-                                    // todo: commit and trans new
+                                    CommitTransfer(tpCustInfo, retryItem.TransId, transferAmount, checkResult.Status, checkResult.RespData.TransId);
                                     break;
                                 case TransferStatus.Pending:
-                                    // todo: add to failed list
+                                    failedList.Add(new TransferBackFailedRecord
+                                    {
+                                        CustId = retryItem.CustId,
+                                        Message = checkResult.Status.ToString(),
+                                        TransId = retryItem.TransId
+                                    });
                                     return;
                             }
                         }
 
-
-                       /* var tpBalanceInfo = CheckUserBalanceAsync(retryItem).Result;
+                        // 進行轉帳重送
+                        // Step 1: 取得沙巴餘額
+                        var tpBalanceInfo = CheckUserBalanceAsync(tpCustInfo).Result;
 
                         if (tpBalanceInfo.Balance <= 0)
                             return;
 
-                        // if balance < 1, update user min transfer limit
+                        // Step 2: 餘額 < 1 時調整轉帳下限
                         if (tpBalanceInfo.Balance < 1)
                         {
-                            _ = UpdateMemberAsync(retryItem.TpUserName, retryItem.SiteId).Result;
+                            _ = UpdateMemberAsync(tpCustInfo, tpCustInfo.SiteId).Result;
                         }
 
-                        var tpTransferInfo = new TpTransferInfoModel
-                        {
-                            TpId = retryItem.TpId,
-                            CustId = retryItem.CustId,
-                            SiteId = retryItem.SiteId,
-                            UserName = tpBalanceInfo.TpUserName,
-                            Amount = tpBalanceInfo.Balance,
-                            Prefix = TransferPrefix.FT.ToString(),
-                            Direction = (int)Direction.ToMain,
-                            Memo = "system force transfer: switch to seamless wallet",
-                            ThirdId = null,
-                            ExtensionInfo = JsonConvert.SerializeObject(tpBalanceInfo) // todo: 看有沒有要改，先暫時這樣
-                        };
+                        // Step 3: 轉回沙巴餘額
+                        transferAmount = ToOurAmount(tpBalanceInfo.Balance, tpCustInfo.ExchangeRate);
+                        var jsonTpBalanceInfo = JsonConvert.SerializeObject(tpBalanceInfo);
+                        var tpTransferInfo = new TpTransferInfoModel(tpCustInfo, transferAmount, jsonTpBalanceInfo);
 
                         transId = base.CreateTpTransferInfo(tpTransferInfo);
-                        var result = FundTransferAsync(retryItem, tpTransferInfo, transId).Result;
-
-                        if (result.Status != TransferStatus.Success)
-                            failedList.Add(new TransferBackFailedRecord
-                            {
-                                CustId = retryItem.CustId,
-                                TransId = transId,
-                                Message = result.Status.ToString()
-                            });
-
-                        // 有殘餘轉不乾淨的金額
-                        if (result.RespData.AfterAmount > 0)
+                        var (status, respData) = FundTransferAsync(tpCustInfo, tpTransferInfo, transId).Result;
+                        
+                        if (respData.AfterAmount > 0)
                         {
                             remainList.Add(new TransferRemainRecord
                             {
-                                SiteId = retryItem.SiteId,
-                                CustId = retryItem.CustId,
-                                UserName = retryItem.UserName,
-                                RemainAmount = result.RespData.AfterAmount
+                                SiteId = tpCustInfo.SiteId,
+                                CustId = tpCustInfo.CustId,
+                                UserName = tpCustInfo.UserName,
+                                RemainAmount = ToOurAmount(respData.AfterAmount, tpCustInfo.ExchangeRate)
                             });
-                        }*/
+                        }
+                        
+                        if (status != TransferStatus.Success)
+                        {
+                            failedList.Add(new TransferBackFailedRecord
+                            {
+                                CustId = tpCustInfo.CustId,
+                                TransId = transId,
+                                Message = status.ToString()
+                            });
+
+                            return;
+                        }
+
+                        // Step 4: 更新轉帳結果
+                        CommitTransfer(tpCustInfo, transId, transferAmount, status, respData.TransId);
+
                     }
                     catch (Exception ex)
                     {
@@ -225,6 +232,8 @@ namespace ThirdPartyTool.Core.ThirdParty
 
             return (failedList, remainList);
         }
+
+        #region Private
 
         private async Task<bool> KickUserAsync(TpCustInfoModel tpCustInfo)
         {
@@ -254,7 +263,7 @@ namespace ThirdPartyTool.Core.ThirdParty
 
             return true;
         }
-        
+
         private async Task<CheckUserBalanceData> CheckUserBalanceAsync(TpCustInfoModel tpCustInfo)
         {
             var tpSetting = GetThirdPartyModel(tpCustInfo.SiteId).TpSetting;
@@ -289,13 +298,14 @@ namespace ThirdPartyTool.Core.ThirdParty
         {
             var tpSetting = GetThirdPartyModel(tpCustInfo.SiteId).TpSetting;
             var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.FundTransfer;
+            var amount = ToTpAmount(tpTransferInfo.Amount, tpCustInfo.ExchangeRate);
 
             var request = new Dictionary<string, string>
             {
                 { "vendor_id", tpSetting["VendorId"] },
                 { "vendor_member_id", tpCustInfo.TpUserName },
                 { "vendor_trans_id", transId },
-                { "amount ", tpTransferInfo.Amount.ToString("##.###") },
+                { "amount ", amount.ToString("##.###") },
                 { "currency", tpCustInfo.TpCurrencyId },
                 { "direction", ((int)Direction.ToMain).ToString() },
                 { "wallet_id ", WalletId }
@@ -321,7 +331,7 @@ namespace ThirdPartyTool.Core.ThirdParty
             return (status, result.Data);
         }
 
-        private async Task<TransferStatus> CheckFundTransferAsync(string transId, int siteId)
+        private async Task<(TransferStatus Status, CheckFundTransferRespData RespData)> CheckFundTransferAsync(string transId, int siteId)
         {
             var tpSetting = GetThirdPartyModel(siteId).TpSetting;
             var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.CheckFundTransfer;
@@ -349,20 +359,21 @@ namespace ThirdPartyTool.Core.ThirdParty
 
             var status = SabaDefinition.GetCheckTransferStatus(result.ErrorCode, result.Data.Status);
 
-            return status;
+            return (status, result.Data);
         }
 
-        private async Task<bool> UpdateMemberAsync(string tpUserName, int siteId)
+        private async Task<bool> UpdateMemberAsync(TpCustInfoModel tpCustInfo, int siteId)
         {
             var tpSetting = GetThirdPartyModel(siteId).TpSetting;
             var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.CheckFundTransfer;
+            var minTransfer = tpCustInfo.ExchangeRate == 1000 ? "0.001" : "0.01";
 
             var request = new Dictionary<string, string>
             {
                 { "vendor_id", tpSetting["VendorId"] },
-                { "vendor_Member_ID ", tpUserName },
+                { "vendor_Member_ID ", tpCustInfo.TpUserName },
                 { "maxTransfer", int.MaxValue.ToString() },
-                { "minTransfer", "0.01" },
+                { "minTransfer", minTransfer },
                 { "oddstype", "1" }
             };
 
@@ -370,7 +381,7 @@ namespace ThirdPartyTool.Core.ThirdParty
             if (!response.StatusCode.IsSuccessStatus())
             {
                 throw new CustomException(
-                    $"Saba UpdateMember failed, HttpStatus: {(int)response.StatusCode} {response.StatusCode}, TpUserName: {tpUserName}");
+                    $"Saba UpdateMember failed, HttpStatus: {(int)response.StatusCode} {response.StatusCode}, TpUserName: {tpCustInfo.TpUserName}");
             }
 
             var result = response.Result;
@@ -383,7 +394,94 @@ namespace ThirdPartyTool.Core.ThirdParty
             return true;
         }
 
+        public void CommitTransfer(TpCustInfoModel tpCustInfo, string transId, decimal transferAmount, TransferStatus transferStatus, string thirdId)
+        {
+            var m = Regex.Match(transId, @"\d+");
+            var transferId = int.Parse(m.Value);
+            var setTpTransferInfo = new SetTpTransferInfoModel
+            {
+                TransferId = transferId,
+                ThirdId = thirdId,
+                ForStatus = TransferStatus.Pending,
+                Status = transferStatus
+            };
+
+            var setWalletBalance = new SetWalletBalanceModel
+            {
+                CustId = tpCustInfo.CustId,
+                SiteId = tpCustInfo.SiteId,
+                TpId = this.TpId,
+                UserName = tpCustInfo.UserName,
+                Amount = transferAmount,
+                Memo = "system: saba switch to seamless wallet",
+                RefTransId = transId
+            };
+
+            using var conn = MainDbDataLayer.GetMySqlConnection();
+            conn.Open();
+            var trans = conn.BeginTransaction();
+
+            try
+            {
+                var setTransferSuccess = MainDbDataLayer.SetTpTransferInfo(setTpTransferInfo, trans);
+                if (setTransferSuccess && setTpTransferInfo.Status == TransferStatus.Success)
+                {
+                    // 轉移進行中紅利至單一錢包，轉帳金額須扣除紅利金額
+                    var bonusAmount = MainDbDataLayer.SetSabaBonus(setWalletBalance.SiteId, setWalletBalance.RefTransId, trans);
+                    setWalletBalance.Amount -= bonusAmount;
+
+                    var setWalletResult = MainDbDataLayer.SetWalletBalance(setWalletBalance, trans);
+                    if (setWalletResult.Success)
+                    {
+                        trans.Commit();
+                        Logger.LogInformation(
+                            $"{setWalletBalance.CustId} {setWalletBalance.UserName} AfterAmount: {setWalletResult.AfterAmount}");
+                    }
+                    else
+                    {
+                        trans.Rollback();
+                        throw new CustomException(
+                            $"TransferId: {setTpTransferInfo.TransferId}, CustId:{setWalletBalance.CustId}, SetWalletBalance failed.");
+                    }
+                }
+                else
+                {
+                    trans.Rollback();
+                    throw new CustomException(
+                        $"TransferId: {setTpTransferInfo.TransferId}, CustId:{setWalletBalance.CustId} SetTpTransferInfo failed.");
+                }
+            }
+            catch (Exception ex)
+            {
+                trans.Rollback();
+                throw new CustomException(
+                    $"TransferId: {setTpTransferInfo.TransferId}, CustId:{setWalletBalance.CustId} ,CommitTpTransfer Exception.", ex);
+            }
+        }
+
+        private decimal ToOurAmount(decimal amount, decimal exchangeRate)
+        {
+            if (exchangeRate > 1)
+            {
+                return amount * exchangeRate;
+            }
+
+            return amount;
+        }
+
+        private decimal ToTpAmount(decimal amount, decimal exchangeRate)
+        {
+            if (exchangeRate > 1)
+            {
+                return amount / exchangeRate;
+            }
+
+            return amount;
+        }
+
         private ThirdPartyModel GetThirdPartyModel(int siteId)
             => _thirdPartyModel.TryGetValue(siteId, out var result) ? result : _thirdPartyModel[0];
+
+        #endregion
     }
 }
