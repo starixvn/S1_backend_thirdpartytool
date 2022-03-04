@@ -91,17 +91,17 @@ namespace ThirdPartyTool.Core.ThirdParty
                         var tpTransferInfo = new TpTransferInfoModel(tpCustInfo, transferAmount, jsonTpBalanceInfo);
                         
                         transId = base.CreateTpTransferInfo(tpTransferInfo);
-                        var (status, respData) = FundTransferAsync(tpCustInfo, tpTransferInfo, transId).Result;
+                        var (status, resp) = FundTransferAsync(tpCustInfo, tpTransferInfo, transId).Result;
 
                         // 有殘餘轉不乾淨的金額
-                        if (respData.AfterAmount > 0)
+                        if (resp.Data.AfterAmount > 0)
                         {
                             remainList.Add(new TransferRemainRecord
                             {
                                 SiteId = tpCustInfo.SiteId,
                                 CustId = tpCustInfo.CustId,
                                 UserName = tpCustInfo.UserName,
-                                RemainAmount = ToOurAmount(respData.AfterAmount, tpCustInfo.ExchangeRate)
+                                RemainAmount = ToOurAmount(resp.Data.AfterAmount, tpCustInfo.ExchangeRate)
                             });
                         }
 
@@ -112,14 +112,15 @@ namespace ThirdPartyTool.Core.ThirdParty
                             {
                                 CustId = tpCustInfo.CustId,
                                 TransId = transId,
-                                Message = status.ToString()
+                                Message = string.IsNullOrEmpty(resp.Message)
+                                    ? resp.Message : status.ToString()
                             });
 
                             return;
                         }
                         
                         // Step 4: 更新轉帳結果
-                        CommitTransfer(tpCustInfo, transId, transferAmount, status, respData.TransId);
+                        CommitTransfer(tpCustInfo, transId, transferAmount, status, resp.Data.TransId);
                     }
                     catch (Exception ex)
                     {
@@ -158,11 +159,11 @@ namespace ThirdPartyTool.Core.ThirdParty
                             switch (checkResult.Status)
                             {
                                 case TransferStatus.Success:
-                                    transferAmount = ToOurAmount(checkResult.RespData.Amount, this.TpId);
-                                    CommitTransfer(tpCustInfo, retryItem.TransId, transferAmount, checkResult.Status, checkResult.RespData.TransId);
+                                    transferAmount = ToOurAmount(checkResult.Resp.Data.Amount, this.TpId);
+                                    CommitTransfer(tpCustInfo, retryItem.TransId, transferAmount, checkResult.Status, checkResult.Resp.Data.TransId);
                                     return;
                                 case TransferStatus.Failed:
-                                    CommitTransfer(tpCustInfo, retryItem.TransId, transferAmount, checkResult.Status, checkResult.RespData?.TransId);
+                                    CommitTransfer(tpCustInfo, retryItem.TransId, transferAmount, checkResult.Status, checkResult.Resp.Data?.TransId);
                                     break;
                                 case TransferStatus.Pending:
                                     failedList.Add(new TransferBackFailedRecord
@@ -174,7 +175,7 @@ namespace ThirdPartyTool.Core.ThirdParty
                                     return;
                             }
                         }
-
+                        
                         // 進行轉帳重送
                         // Step 1: 取得沙巴餘額
                         var tpBalanceInfo = CheckUserBalanceAsync(new List<TpCustInfoModel> { tpCustInfo })
@@ -199,16 +200,16 @@ namespace ThirdPartyTool.Core.ThirdParty
                         var tpTransferInfo = new TpTransferInfoModel(tpCustInfo, transferAmount, jsonTpBalanceInfo);
 
                         transId = base.CreateTpTransferInfo(tpTransferInfo);
-                        var (status, respData) = FundTransferAsync(tpCustInfo, tpTransferInfo, transId).Result;
+                        var (status, resp) = FundTransferAsync(tpCustInfo, tpTransferInfo, transId).Result;
                         
-                        if (respData.AfterAmount > 0)
+                        if (resp.Data.AfterAmount > 0)
                         {
                             remainList.Add(new TransferRemainRecord
                             {
                                 SiteId = tpCustInfo.SiteId,
                                 CustId = tpCustInfo.CustId,
                                 UserName = tpCustInfo.UserName,
-                                RemainAmount = ToOurAmount(respData.AfterAmount, tpCustInfo.ExchangeRate)
+                                RemainAmount = ToOurAmount(resp.Data.AfterAmount, tpCustInfo.ExchangeRate)
                             });
                         }
                         
@@ -218,14 +219,15 @@ namespace ThirdPartyTool.Core.ThirdParty
                             {
                                 CustId = tpCustInfo.CustId,
                                 TransId = transId,
-                                Message = status.ToString()
+                                Message = string.IsNullOrEmpty(resp.Message)
+                                    ? resp.Message : status.ToString()
                             });
 
                             return;
                         }
 
                         // Step 4: 更新轉帳結果
-                        CommitTransfer(tpCustInfo, transId, transferAmount, status, respData.TransId);
+                        CommitTransfer(tpCustInfo, transId, transferAmount, status, resp.Data.TransId);
 
                     }
                     catch (Exception ex)
@@ -256,15 +258,14 @@ namespace ThirdPartyTool.Core.ThirdParty
                 { "vendor_member_id", tpCustInfo.TpUserName }
             };
 
-            var response = await HttpHelper.PostUrlEncodedAsync<Dictionary<string, string>, KickUserResp>(apiUrl, request);
-            if (!response.StatusCode.IsSuccessStatus())
+            var (result, statusCode) = await HttpHelper.PostUrlEncodedAsync<Dictionary<string, string>, KickUserResp>(apiUrl, request);
+            if (!statusCode.IsSuccessStatus())
             {
                 throw new CustomException(
-                    $"Saba KickUser failed, HttpStatus: {(int)response.StatusCode} {response.StatusCode}" +
+                    $"Saba KickUser failed, HttpStatus: {(int)statusCode} {statusCode}" +
                     $", SiteId: {tpCustInfo.SiteId} CustId: {tpCustInfo.CustId} TpUserName: {tpCustInfo.TpUserName}");
             }
 
-            var result = response.Result;
             if (!SabaDefinition.KickUserSuccess(result.ErrorCode))
             {
                 throw new CustomException(
@@ -315,7 +316,7 @@ namespace ThirdPartyTool.Core.ThirdParty
             return balanceInfoList;
         }
 
-        private async Task<(TransferStatus Status, FundTransferRespData RespData)> FundTransferAsync(TpCustInfoModel tpCustInfo, TpTransferInfoModel tpTransferInfo, string transId)
+        private async Task<(TransferStatus Status, FundTransferResp Resp)> FundTransferAsync(TpCustInfoModel tpCustInfo, TpTransferInfoModel tpTransferInfo, string transId)
         {
             var tpSetting = GetThirdPartyModel(tpCustInfo.SiteId).TpSetting;
             var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.FundTransfer;
@@ -349,10 +350,10 @@ namespace ThirdPartyTool.Core.ThirdParty
 
             var status = SabaDefinition.GetTransferStatus(result.Data.Status);
 
-            return (status, result.Data);
+            return (status, result);
         }
 
-        private async Task<(TransferStatus Status, CheckFundTransferRespData RespData)> CheckFundTransferAsync(string transId, int siteId)
+        private async Task<(TransferStatus Status, CheckFundTransferResp Resp)> CheckFundTransferAsync(string transId, int siteId)
         {
             var tpSetting = GetThirdPartyModel(siteId).TpSetting;
             var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.CheckFundTransfer;
@@ -380,7 +381,7 @@ namespace ThirdPartyTool.Core.ThirdParty
 
             var status = SabaDefinition.GetCheckTransferStatus(result.ErrorCode, result.Data?.Status);
 
-            return (status, result.Data);
+            return (status, result);
         }
 
         private async Task<bool> UpdateMemberAsync(TpCustInfoModel tpCustInfo, int siteId)
