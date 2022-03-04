@@ -16,7 +16,7 @@ namespace ThirdPartyTool.Core.Models
             Amount = transferAmount;
             Prefix = TransferPrefix.FT.ToString();
             Direction = (int)Enums.Direction.ToMain;
-            Memo = "system force transfer: saba switch to seamless wallet";
+            Memo = "system transfer: switch to seamless wallet";
             ThirdId = null;
             ExtensionInfo = extensionInfo;
         }

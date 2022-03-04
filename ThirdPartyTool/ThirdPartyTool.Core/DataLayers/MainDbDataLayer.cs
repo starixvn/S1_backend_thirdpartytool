@@ -62,7 +62,7 @@ namespace ThirdPartyTool.Core.DataLayers
             parameter.Add("ExtensionInfo", input.ExtensionInfo);
             parameter.Add("BonusId", input.BonusId);
 
-            return _dbClient.QueryFirst<string>("TpTransferInfo", trans, parameter);
+            return _dbClient.QueryFirst<string>("Service_TpTransferInfo_Ins", trans, parameter);
         }
 
         public bool SetTpTransferInfo(SetTpTransferInfoModel input, IDbTransaction trans)
@@ -74,7 +74,7 @@ namespace ThirdPartyTool.Core.DataLayers
             parameter.Add("ForStatus", (int)input.ForStatus);
             parameter.Add("Status", (int)input.Status);
 
-            return _dbClient.Execute("TpTransferInfo", trans, parameter) > 0;
+            return _dbClient.Execute("TpTransferInfo_Set", trans, parameter) > 0;
         }
 
         public (bool Success, decimal AfterAmount) SetWalletBalance(SetWalletBalanceModel input, IDbTransaction trans)
@@ -85,6 +85,7 @@ namespace ThirdPartyTool.Core.DataLayers
             parameter.Add("SiteId", input.SiteId);
             parameter.Add("Amount", input.Amount);
             parameter.Add("TYPE", TypePosition + input.TpId);
+            parameter.Add("Memo", input.Memo);
             parameter.Add("RefTransId", input.RefTransId);
             parameter.Add("Is1stDepoist", dbType: DbType.Byte, direction: ParameterDirection.Output);
             parameter.Add("AfterAmount", dbType: DbType.Decimal, direction: ParameterDirection.Output);

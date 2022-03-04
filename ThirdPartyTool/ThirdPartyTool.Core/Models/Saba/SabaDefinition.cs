@@ -28,7 +28,7 @@ namespace ThirdPartyTool.Core.Models.Saba
             return errorCode switch
             {
                 SabaSuccessCode => GetTransferStatus(status),
-                "2" => TransferStatus.Failed, // 會員不存在
+                "2" => TransferStatus.Failed, // 交易不存在
                 _ => TransferStatus.Pending
             };
         }
@@ -67,6 +67,11 @@ namespace ThirdPartyTool.Core.Models.Saba
         /// 確認轉帳狀態
         /// </summary>
         public const string CheckFundTransfer = "/CheckFundTransfer";
+
+        /// <summary>
+        /// 更新會員資訊
+        /// </summary>
+        public const string UpdateMember = "/UpdateMember";
     }
 
     internal class KickUserErrorCode
