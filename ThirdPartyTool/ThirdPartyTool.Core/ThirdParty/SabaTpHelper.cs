@@ -60,10 +60,23 @@ namespace ThirdPartyTool.Core.ThirdParty
         {
             var failedList = new List<TransferBackFailedRecord>();
             var remainList = new List<TransferRemainRecord>();
+            var tpBalanceInfoList = new List<CheckUserBalanceData>();
 
             // Step 1: 取得沙巴餘額
-            var tpBalanceInfoList = CheckUserBalanceAsync(todoList).Result;
+            try
+            {
+                tpBalanceInfoList = CheckUserBalanceAsync(todoList).Result.ToList();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                failedList = todoList
+                    .Select(x => new TransferBackFailedRecord(x.CustId, string.Empty, "Get saba user balance failed."))
+                    .ToList();
 
+                return (failedList, remainList);
+            }
+            
             Parallel.ForEach(todoList,
                 new ParallelOptions() { MaxDegreeOfParallelism = taskCount },
                 tpCustInfo =>
