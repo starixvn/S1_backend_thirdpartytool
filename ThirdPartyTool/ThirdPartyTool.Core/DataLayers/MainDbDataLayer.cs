@@ -21,33 +21,7 @@ namespace ThirdPartyTool.Core.DataLayers
             _dbClient = a.First(p => p.DataBase == DataBase.Main);
         }
 
-        /// <summary>
-        /// 取得指定第三方客戶資訊清單
-        /// </summary>
-        /// <param name="tpId">第三方ID</param>
-        /// <param name="siteId">平台ID</param>
-        /// <returns></returns>
-        public IEnumerable<TpCustInfoModel> GetTpAllCustInfoList(int tpId, int siteId)
-        {
-            var parameter = new DynamicParameters();
-            parameter.Add("_FirstRun", true);
-            parameter.Add("_TpId", tpId);
-            parameter.Add("_SiteId", siteId);
-
-            return _dbClient.Query<TpCustInfoModel>("Service_TpCustInfo_Get", parameters: parameter);
-        }
-
-
-        public IEnumerable<TpCustInfoModel> GetTpAllCustInfoByCust(int tpId, string jsonCustIds)
-        {
-            var parameter = new DynamicParameters();
-            parameter.Add("_TpId", tpId);
-            parameter.Add("_CustIds", jsonCustIds);
-
-            return _dbClient.Query<TpCustInfoModel>("Service_TpCustInfoListByCust_Get", parameters: parameter);
-        }
-
-        public string CreateTpTransferInfo(TpTransferInfoModel input, IDbTransaction trans)
+        public string CreateTpTransferInfo(TpTransferInfoModel input)
         {
             var parameter = new DynamicParameters();
             parameter.Add("TpId", input.TpId);
@@ -62,7 +36,7 @@ namespace ThirdPartyTool.Core.DataLayers
             parameter.Add("ExtensionInfo", input.ExtensionInfo);
             parameter.Add("BonusId", input.BonusId);
 
-            return _dbClient.QueryFirst<string>("Service_TpTransferInfo_Ins", trans, parameter);
+            return _dbClient.QueryFirst<string>("Service_TpTransferInfo_Ins", parameters: parameter);
         }
 
         public bool SetTpTransferInfo(SetTpTransferInfoModel input, IDbTransaction trans)

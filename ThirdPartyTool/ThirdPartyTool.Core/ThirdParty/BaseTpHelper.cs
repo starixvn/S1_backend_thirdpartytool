@@ -14,38 +14,31 @@ namespace ThirdPartyTool.Core.ThirdParty
         protected readonly ILogger<BaseTpHelper> Logger;
         protected readonly IHttpHelper HttpHelper;
         protected readonly MainDbDataLayer MainDbDataLayer;
+        protected readonly ReportDbDataLayer ReportDataLayer;
 
         public BaseTpHelper(IServiceProvider provider)
         {
             Logger = provider.GetRequiredService<ILogger<BaseTpHelper>>();
             HttpHelper = provider.GetRequiredService<IHttpHelper>();
             MainDbDataLayer = provider.GetRequiredService<MainDbDataLayer>();
+            ReportDataLayer = provider.GetRequiredService<ReportDbDataLayer>();
         }
 
         public IEnumerable<TpCustInfoModel> GeTptAllCustInfoList(int tpId, int siteId)
         {
-            return MainDbDataLayer.GetTpAllCustInfoList(tpId, siteId);
+            return ReportDataLayer.GetTpAllCustInfoList(tpId, siteId);
         }
 
         public IEnumerable<TpCustInfoModel> GetTpAllCustInfoByCust(int tpId, string jsonCustIds)
         {
-            return MainDbDataLayer.GetTpAllCustInfoByCust(tpId, jsonCustIds);
+            return ReportDataLayer.GetTpAllCustInfoByCust(tpId, jsonCustIds);
         }
 
         public string CreateTpTransferInfo(TpTransferInfoModel tpTransferInfo)
         {
-            using var conn = MainDbDataLayer.GetMySqlConnection();
-
-            conn.Open();
-            var trans = conn.BeginTransaction();
-            var transId = MainDbDataLayer.CreateTpTransferInfo(tpTransferInfo, trans);
-            if (!string.IsNullOrEmpty(transId))
+            var transId = MainDbDataLayer.CreateTpTransferInfo(tpTransferInfo);
+            if (string.IsNullOrEmpty(transId))
             {
-                trans.Commit();
-            }
-            else
-            {
-                trans.Rollback();
                 throw new CustomException("CreateTpTransferInfo return TransId is empty.");
             }
 

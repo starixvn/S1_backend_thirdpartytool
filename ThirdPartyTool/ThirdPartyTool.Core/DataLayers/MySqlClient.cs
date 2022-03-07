@@ -146,7 +146,7 @@ namespace ThirdPartyTool.Core.DataLayers
             return result;
         }
 
-        public T QueryFirst<T>(string name, IDbTransaction trans, object parameters = null)
+        public T QueryFirst<T>(string name, IDbTransaction trans = null, object parameters = null)
         {
             var sw = Stopwatch.StartNew();
             T result;

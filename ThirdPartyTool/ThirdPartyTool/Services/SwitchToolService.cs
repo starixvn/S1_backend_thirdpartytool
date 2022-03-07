@@ -122,7 +122,7 @@ namespace ThirdPartyTool.Services
 
         private void BatchDoAction(ActionType action, IEnumerable<TpCustInfoModel> custInfoList, int tpId)
         {
-            var list = custInfoList.ToList();
+            var list = custInfoList;
             var count = list.Count();
             var index = 0;
 
@@ -158,8 +158,8 @@ namespace ThirdPartyTool.Services
         {
             var tpHelper = _tpHandler[tpId];
             var result = tpHelper.ParallelTransferBack(custInfoList, _taskCount);
-            var failedList = result.FailedRecords.ToList();
-            var remainList = result.RemainRecords.ToList();
+            var failedList = result.FailedRecords;
+            var remainList = result.RemainRecords;
 
             if (failedList.Any())
             {
