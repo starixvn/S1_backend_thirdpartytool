@@ -106,17 +106,22 @@ namespace ThirdPartyTool.Services
                 var list = GetSpecificCustInfoList(tpId);
                 _logger.LogInformation($"=== Start specific {actionDesc} ===");
                 BatchDoAction(action, list, tpId);
-                _logger.LogInformation($"=== End specific {actionDesc}, cost: {stopWatch.Elapsed:g} ===");
+                _logger.LogInformation($"=== End specific {actionDesc}, total count: {list.Count()}, cost: {stopWatch.Elapsed:g} ===");
             }
             else
             {
+                var totalCount = 0;
                 foreach (var siteId in _supportSiteIds)
                 {
                     _logger.LogInformation($"=== Start {actionDesc}, siteId: {siteId} ===");
                     var list = _baseTpHelper.GeTptAllCustInfoList(tpId, siteId);
+                    var count = list.Count();
                     BatchDoAction(action, list, tpId);
-                    _logger.LogInformation($"=== End {actionDesc}, siteId: {siteId}, cost: {stopWatch.Elapsed:g} ===");
+                    _logger.LogInformation($"=== End {actionDesc}, siteId: {siteId}, count: {count}, total cost: {stopWatch.Elapsed:g} ===");
+                    totalCount += count;
                 }
+
+                _logger.LogInformation($"=== {actionDesc} End, total count: {totalCount} ===");
             }
         }
 
@@ -148,7 +153,7 @@ namespace ThirdPartyTool.Services
             if (kickUserFailedList.Any())
             {
                 var fileName = $"kick_failed_{_yyyyMMddHHmm}.txt";
-                var str = string.Join(',', kickUserFailedList);
+                var str = string.Join(',', kickUserFailedList) + Environment.NewLine;
 
                 AppendToFileEnd(fileName, str);
             }
