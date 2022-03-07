@@ -206,7 +206,7 @@ namespace ThirdPartyTool.Services
         private void BatchTransferRetry(IEnumerable<TransferBackRetryModel> retryList, int tpId)
         {
             var tpHelper = _tpHandler[tpId];
-            var list = retryList.ToList();
+            var list = retryList;
             var count = list.Count();
             var index = 0;
 
@@ -219,8 +219,8 @@ namespace ThirdPartyTool.Services
                     .Take(_batchCount);
 
                 var result = tpHelper.ParallelTransferRetry(doList, _taskCount);
-                var failedList = result.FailedRecords.ToList();
-                var remainList = result.RemainRecords.ToList();
+                var failedList = result.FailedRecords;
+                var remainList = result.RemainRecords;
 
                 if (failedList.Any())
                 {

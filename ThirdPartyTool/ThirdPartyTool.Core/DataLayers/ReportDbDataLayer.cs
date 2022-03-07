@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 using Dapper;
 using Microsoft.Extensions.DependencyInjection;
@@ -23,7 +24,7 @@ namespace ThirdPartyTool.Core.DataLayers
         }
 
         /// <summary>
-        /// 取得指定第三方客戶資訊清單
+        /// 取得指定第三方有交易紀錄的客戶資訊清單
         /// </summary>
         /// <param name="tpId">第三方ID</param>
         /// <param name="siteId">平台ID</param>
@@ -31,11 +32,33 @@ namespace ThirdPartyTool.Core.DataLayers
         public IEnumerable<TpCustInfoModel> GetTpAllCustInfoList(int tpId, int siteId)
         {
             var parameter = new DynamicParameters();
-            parameter.Add("_FirstRun", true);
             parameter.Add("_TpId", tpId);
             parameter.Add("_SiteId", siteId);
-
-            return _dbClient.Query<TpCustInfoModel>("Service_TpCustInfo_Get", parameters: parameter);
+            var sql = @"
+                SELECT
+                    TC.TpId,
+                    TC.CustId,
+                    TC.SiteId,
+                    C.CurrencyId,
+                    TC.UserName,
+                    TC.TpUserName,
+                    TC.TpPwd,
+                    TCY.TpCurrencyId,
+                    TCY.ExchangeRate,
+                    C.IsTest,
+                    C.ActStatus,
+                    TC.`Status` AS TpCustStatus,
+                    C.`Status` AS CustStatus
+                FROM TpCurrency AS TCY
+                INNER JOIN Customer AS C
+                    ON C.CurrencyId = TCY.CurrencyId
+                RIGHT OUTER JOIN TpCustInfo AS TC
+                    ON TC.CustId = C.CustId AND TC.TpId = TCY.TpId
+                WHERE TC.TpId = @_TpId
+		            AND TC.SiteId = @_SiteId
+                    AND TC.LastTradingTime IS NOT NULL;";
+            
+            return _dbClient.Query<TpCustInfoModel>(sql, parameters: parameter, commandType: CommandType.Text);
         }
 
 
