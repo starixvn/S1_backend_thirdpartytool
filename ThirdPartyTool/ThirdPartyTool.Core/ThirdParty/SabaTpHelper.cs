@@ -440,7 +440,7 @@ namespace ThirdPartyTool.Core.ThirdParty
                     };
 
                     // 轉移進行中紅利至單一錢包，轉帳金額須扣除紅利金額
-                    var bonusAmount = MainDbDataLayer.SetSabaBonus(setWalletBalance.SiteId, setWalletBalance.RefTransId, trans);
+                    var bonusAmount = MainDbDataLayer.SetSabaBonus(tpCustInfo.CustId, transId, trans);
                     setWalletBalance.Amount -= bonusAmount;
 
                     var setWalletResult = MainDbDataLayer.SetWalletBalance(setWalletBalance, trans);
