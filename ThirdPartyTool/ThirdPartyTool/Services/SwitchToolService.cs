@@ -104,12 +104,25 @@ namespace ThirdPartyTool.Services
             if (isSpecific)
             {
                 var list = GetSpecificCustInfoList(tpId);
+
+                Console.WriteLine($"The specific custom list to {actionDesc}:");
+                Console.WriteLine("\tSiteId, CustId, UserName");
+                foreach (var cust in list)
+                    Console.WriteLine($"\t{cust.SiteId}, {cust.CustId}, {cust.UserName}");
+       
+                if (!Confirm())
+                    return;
+
                 _logger.LogInformation($"=== Start specific {actionDesc} ===");
                 BatchDoAction(action, list, tpId);
                 _logger.LogInformation($"=== End specific {actionDesc}, total count: {list.Count()}, cost: {stopWatch.Elapsed:g} ===");
             }
             else
             {
+                Console.WriteLine($"Will do {actionDesc} for sites: {string.Join(",", _supportSiteIds)}");
+                if (!Confirm())
+                    return;
+
                 var totalCount = 0;
                 foreach (var siteId in _supportSiteIds)
                 {
@@ -195,10 +208,18 @@ namespace ThirdPartyTool.Services
                 Console.WriteLine("No retry data!");
                 return;
             }
-
+            
             var jsonCustIds = JsonConvert.SerializeObject(retryList.Select(x => x.CustId));
             var custInfoList = _baseTpHelper.GetTpAllCustInfoByCust(tpId, jsonCustIds);
             retryList.ForEach(x => x.TpCustInfo = custInfoList.FirstOrDefault(ci => ci.CustId == x.CustId));
+
+            Console.WriteLine("The list for retry transfer back:");
+            Console.WriteLine("\tSiteId, CustId, UserName, TransId");
+            foreach (var item in retryList)
+                Console.WriteLine($"\t{item.TpCustInfo.SiteId}, {item.CustId}, {item.TpCustInfo.UserName}, {item.TransId}");
+
+            if (!Confirm())
+                return;
 
             var stopWatch = new Stopwatch();
             stopWatch.Start();
@@ -356,6 +377,14 @@ namespace ThirdPartyTool.Services
                 using StreamWriter sw = File.AppendText(fullPath);
                 sw.Write(str);
             }
+        }
+
+        private static bool Confirm()
+        {
+            Console.WriteLine("Please enter 'Y' to confirm that you want to do the action.");
+            var str = Console.ReadLine();
+
+            return str?.Equals("Y", StringComparison.OrdinalIgnoreCase) ?? false;
         }
 
         private static ActionType ParseActionType(string str)
