@@ -99,7 +99,6 @@ namespace ThirdPartyTool.Services
             var isSpecific = GetIsSpecific();
             var actionDesc = action.GetDescription();
             var stopWatch = new Stopwatch();
-            stopWatch.Start();
 
             if (isSpecific)
             {
@@ -113,6 +112,7 @@ namespace ThirdPartyTool.Services
                 if (!Confirm())
                     return;
 
+                stopWatch.Start();
                 _logger.LogInformation($"=== Start specific {actionDesc} ===");
                 BatchDoAction(action, list, tpId);
                 _logger.LogInformation($"=== End specific {actionDesc}, total count: {list.Count()}, cost: {stopWatch.Elapsed:g} ===");
@@ -123,6 +123,7 @@ namespace ThirdPartyTool.Services
                 if (!Confirm())
                     return;
 
+                stopWatch.Start();
                 var totalCount = 0;
                 foreach (var siteId in _supportSiteIds)
                 {
