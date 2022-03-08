@@ -146,13 +146,33 @@ namespace ThirdPartyTool.Core.DataLayers
             return result;
         }
 
-        public T QueryFirst<T>(string name, IDbTransaction trans = null, object parameters = null)
+        public T QueryFirst<T>(string name, IDbTransaction trans, object parameters = null)
         {
             var sw = Stopwatch.StartNew();
             T result;
             try
             {
                 result = trans.Connection.QueryFirst<T>(name, param: parameters, transaction: trans, commandType: CommandType.StoredProcedure);
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, name);
+                throw;
+            }
+
+            LogContext.PushProperty("elapsed", sw.Elapsed.TotalMilliseconds);
+            _logger.LogDebug($"{name} {sw.Elapsed:c}");
+            return result;
+        }
+
+        public T QueryFirst<T>(string name, object parameters = null)
+        {
+            var sw = Stopwatch.StartNew();
+            T result;
+            try
+            {
+                using var connection = new MySqlConnection(_connectionString);
+                result = connection.QueryFirst<T>(name, param: parameters, commandType: CommandType.StoredProcedure);
             }
             catch (Exception e)
             {

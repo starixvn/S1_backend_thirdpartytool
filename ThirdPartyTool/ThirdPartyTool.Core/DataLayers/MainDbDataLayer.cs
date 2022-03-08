@@ -36,7 +36,7 @@ namespace ThirdPartyTool.Core.DataLayers
             parameter.Add("ExtensionInfo", input.ExtensionInfo);
             parameter.Add("BonusId", input.BonusId);
 
-            return _dbClient.QueryFirst<string>("Service_TpTransferInfo_Ins", parameters: parameter);
+            return _dbClient.QueryFirst<string>("Service_TpTransferInfo_Ins", parameter);
         }
 
         public bool SetTpTransferInfo(SetTpTransferInfoModel input, IDbTransaction trans)

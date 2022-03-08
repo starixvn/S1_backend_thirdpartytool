@@ -39,7 +39,6 @@ namespace ThirdPartyTool
                         .UseStartup<Startup>();
                 }).ConfigureServices((hostContext, services) =>
                 {
-                    services.AddDatabaseConnection(Configuration);
                     services.AddHostedService<SwitchToolService>();
                 });
         private static IConfigurationRoot Configuration => new ConfigurationBuilder()
