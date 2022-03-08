@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using Newtonsoft.Json;
 using ThirdPartyTool.Core.DataLayers;
 using ThirdPartyTool.Core.Exceptions;
 using ThirdPartyTool.Core.Helpers.Interfaces;
@@ -36,6 +37,7 @@ namespace ThirdPartyTool.Core.ThirdParty
 
         public string CreateTpTransferInfo(TpTransferInfoModel tpTransferInfo)
         {
+            Logger.LogInformation(JsonConvert.SerializeObject(tpTransferInfo));
             var transId = MainDbDataLayer.CreateTpTransferInfo(tpTransferInfo);
             if (string.IsNullOrEmpty(transId))
             {
