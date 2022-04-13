@@ -1,6 +1,7 @@
 ﻿---
-DatabaseConnectionString: server=13.250.152.76;port=3306;user=nova88;database=Siebog;password=Aa12345678!;
+DatabaseConnectionString: server=10.4.194.36;port=3306;user=nova88;database=Siebog;password=Aa12345678!;
+Proxy: 10.4.194.104:3128
 AmbSetting:
-    Agent: nova88thbtestaa
-    ApiUrl: https://uat.ambslot-api.com
-    SecretKey: 1b15232c9933c8d031a68a98d14a2333
+    Agent: nova88thb
+    ApiUrl: https://prod.ambslot-api.com
+    SecretKey: b69cbd22c847425a441b0551c6cb01c9
