@@ -1,5 +1,6 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Net;
 using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
@@ -33,7 +34,9 @@ namespace AMBSlot
                 };
                 var jsonParam = JsonSerializer.Serialize(param);
                 var key = HMACSHA512(jsonParam, _configuration.AmbSetting.SecretKey);
-                using var httpclient = new HttpClient();
+
+                var handler = CreateHandler();
+                using var httpclient = new HttpClient(handler);
                 httpclient.DefaultRequestHeaders.Add("x-ambslot-signature", key);
                 var content = new StringContent(jsonParam, Encoding.UTF8, "application/json");
                 var responseMessage = await httpclient.PostAsync(apiUrl, content);
@@ -70,6 +73,19 @@ namespace AMBSlot
             using var connection = new MySqlConnection(_configuration.DatabaseConnectionString);
             var result = connection.Query<TpCustInfo>(sql);
             return result;
+        }
+
+        private HttpClientHandler CreateHandler()
+        {
+            var handler = new HttpClientHandler();
+            if (!string.IsNullOrEmpty(_configuration.Proxy))
+            {
+                var proxy = _configuration.Proxy.Split(':');
+                handler.UseProxy = true;
+                handler.Proxy = new WebProxy(proxy[0], int.Parse(proxy[1]));
+            }
+
+            return handler;
         }
     }
 }

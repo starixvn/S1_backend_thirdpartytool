@@ -12,6 +12,7 @@
     public class Configuration
     {
         public string DatabaseConnectionString { get; set; }
+        public string Proxy { get; set; }
         public AmbSetting AmbSetting { get; set; }
     }
 
