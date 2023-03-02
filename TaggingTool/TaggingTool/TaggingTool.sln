@@ -1,0 +1,22 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaggingTool", "TaggingTool\TaggingTool.csproj", "{3306CE08-B155-48D0-8DEB-64A61AFC1628}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "TaggingTool.Core", "TaggingTool.Core\TaggingTool.Core.csproj", "{D51DCC01-6166-4759-844F-7B52EE770833}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{3306CE08-B155-48D0-8DEB-64A61AFC1628}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{3306CE08-B155-48D0-8DEB-64A61AFC1628}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{3306CE08-B155-48D0-8DEB-64A61AFC1628}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{3306CE08-B155-48D0-8DEB-64A61AFC1628}.Release|Any CPU.Build.0 = Release|Any CPU
+		{D51DCC01-6166-4759-844F-7B52EE770833}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{D51DCC01-6166-4759-844F-7B52EE770833}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{D51DCC01-6166-4759-844F-7B52EE770833}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{D51DCC01-6166-4759-844F-7B52EE770833}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+EndGlobal
