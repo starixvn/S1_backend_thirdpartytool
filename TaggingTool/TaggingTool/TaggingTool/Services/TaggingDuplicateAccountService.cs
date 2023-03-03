@@ -28,10 +28,9 @@ public class TaggingDuplicateAccountService
                 _logger.LogInformation($"{DateTime.Now:HH:mm:ss} || Get {site} AccountNameList");
                 
                 // step 2: 比對
-                var duplicateCustList = new List<int>();
                 foreach (var account in accountNameList)
                 {
-                    if (string.IsNullOrWhiteSpace(account.AccountName))
+                    if (account.IsDuplicate || string.IsNullOrWhiteSpace(account.AccountName))
                         continue;
                     
                     var patterns = new[]
@@ -45,10 +44,22 @@ public class TaggingDuplicateAccountService
 
                     if (isDuplicate)
                     {
-                        duplicateCustList.Add(account.CustId);
-                        _logger.LogInformation($"({account.CustId}) {account.AccountName} is duplicate");
+                        var duplicate = accountNameList
+                            .Where(x => !x.IsDuplicate
+                                        && patterns.Any(y => y.Equals(x.AccountName, StringComparison.CurrentCultureIgnoreCase)));
+                        
+                        foreach (var d in duplicate)
+                        {
+                            d.IsDuplicate = true;
+                        
+                            Console.WriteLine($"({d.CustId}) {d.AccountName} is duplicate");
+                        }
                     }
                 }
+                
+                var duplicateCustList = accountNameList.Where(x => x.IsDuplicate)
+                    .Select(x => x.CustId)
+                    .ToList();
                 
                 _logger.LogInformation($"{DateTime.Now:HH:mm:ss} || DuplicateCustList: {duplicateCustList.Count}");
                 
@@ -62,6 +73,7 @@ public class TaggingDuplicateAccountService
                         .Take(cnt)
                         .ToList();
                     _logger.LogInformation($"Processing: {idx * cnt + custList.Count}/{duplicateCustList.Count}...");
+                    
                     try
                     {
                         // 取出用戶的 TagList
@@ -80,10 +92,12 @@ public class TaggingDuplicateAccountService
                             }
                         }
 
+                        _logger.LogInformation($"Processing tagging users: {JsonConvert.SerializeObject(tagList.Select(x=>x.CustId))}");
                         // 壓 tag
-                        /*var result = await _customerService.SetCustInfoTagList(tagList);
+                        var result = await _customerService.SetCustInfoTagList(tagList);
 
-                        _logger.LogInformation($"tagging user: {result}");*/
+                        _logger.LogInformation($"tagging users: {result}");
+                        Thread.Sleep(200);
                     }
                     catch (Exception ex)
                     {
