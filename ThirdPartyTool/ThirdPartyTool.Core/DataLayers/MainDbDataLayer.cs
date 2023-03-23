@@ -53,19 +53,21 @@ namespace ThirdPartyTool.Core.DataLayers
 
         public (bool Success, decimal AfterAmount) SetWalletBalance(SetWalletBalanceModel input, IDbTransaction trans)
         {
-            var parameter = new DynamicParameters();
-            parameter.Add("CustId", input.CustId);
-            parameter.Add("UserName", input.UserName);
-            parameter.Add("SiteId", input.SiteId);
-            parameter.Add("Amount", input.Amount);
-            parameter.Add("TYPE", TypePosition + input.TpId);
-            parameter.Add("Memo", input.Memo);
-            parameter.Add("RefTransId", input.RefTransId);
-            parameter.Add("Is1stDepoist", dbType: DbType.Byte, direction: ParameterDirection.Output);
-            parameter.Add("AfterAmount", dbType: DbType.Decimal, direction: ParameterDirection.Output);
-
-            var success = _dbClient.Execute("Wallet_Set", trans, parameter) > 0;
-            var afterAmount = success ? parameter.Get<decimal>("AfterAmount") : 0;
+            var type = TypePosition + input.TpId;
+            var p = new DynamicParameters(new
+            {
+                CustId = input.CustId,
+                SiteId = input.SiteId,
+                UserName = input.UserName,
+                Amount = input.Amount,
+                Type = type,
+                Memo = input.Memo,
+                RefTransId = input.RefTransId
+            });
+            p.Add("Is1stDepoist", dbType: DbType.Boolean, direction: ParameterDirection.Output);
+            p.Add("AfterAmount", dbType: DbType.Decimal, direction: ParameterDirection.Output);
+            var success = _dbClient.Execute("Wallet_Set_V2", trans, p) > 0;
+            var afterAmount = success ? p.Get<decimal>("AfterAmount") : 0;
 
             return (success, afterAmount);
         }
