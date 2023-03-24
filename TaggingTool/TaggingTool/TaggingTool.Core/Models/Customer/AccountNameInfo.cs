@@ -6,3 +6,9 @@ public class AccountNameInfo
     public string AccountName { get; set; }
     public bool IsDuplicate { get; set; }
 }
+
+
+public class CustAccountNameInfo : CustTagList
+{
+    public string AccountName { get; set; }
+}

@@ -1,3 +1,4 @@
+using System.Data;
 using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using TaggingTool.Core.DataLayers;
@@ -26,6 +27,26 @@ public class CustomerService
         });
             
         return await _reportDbClient.QueryAsync<AccountNameInfo>("Service_CustAccountNameList_Get", parameter);
+    }
+    
+    public async Task<IEnumerable<CustAccountNameInfo>> GetSimilarAccountName(int siteId, IEnumerable<string> accountNames)
+    {
+        var parameter = new DynamicParameters(new
+        {
+            _SiteId = siteId,
+            _AccountNames = JsonConvert.SerializeObject(accountNames)
+        });
+        
+        return await _mainDbClient.QueryAsync<CustAccountNameInfo>("Member_SimilarAccountName_Get",parameter);
+    }
+    
+    public IEnumerable<string> GetAccountNameDirtyData()
+    {
+        var sql = @"select distinct cbi.AccountName from CustBankInfo as cbi
+left join Customer as c on c.CustId = cbi.CustId
+where c.CustId is null;";
+        
+        return _mainDbClient.Query<string>(sql, commandType: CommandType.Text);
     }
     
     public async Task<IEnumerable<CustTagList>> GetCustTagList(IEnumerable<int> custList)

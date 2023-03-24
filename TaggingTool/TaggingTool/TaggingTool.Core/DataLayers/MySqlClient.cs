@@ -31,7 +31,7 @@ namespace TaggingTool.Core.DataLayers
 
         #region Query
 
-         public IEnumerable<T> Query<T>(string name, object parameters = null, int? commandTimeout = null)
+         public IEnumerable<T> Query<T>(string name, object parameters = null, CommandType commandType = CommandType.StoredProcedure, int? commandTimeout = null)
         {
             IEnumerable<T> result;
             var sw = Stopwatch.StartNew();
@@ -40,7 +40,7 @@ namespace TaggingTool.Core.DataLayers
                 using var connection = new MySqlConnection(_connectionString);
                 var command = new CommandDefinition(name, parameters,
                     commandTimeout : commandTimeout,
-                    commandType: CommandType.StoredProcedure,
+                    commandType: commandType,
                     flags: CommandFlags.NoCache);
                 result = connection.Query<T>(command);
                 connection.Close();

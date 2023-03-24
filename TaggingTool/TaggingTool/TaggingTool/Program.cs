@@ -42,7 +42,8 @@ namespace TaggingTool
                 site = ParseActionType(strSite);
             };
 
-            _ = service.DoTagging(site);
+            //_ = service.DoTagging(site);
+            _ = service.RemoveTag(site);
             
             Console.ReadLine();
         }
