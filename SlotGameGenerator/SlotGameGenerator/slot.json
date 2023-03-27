@@ -1,0 +1,36 @@
+{
+    "TpId":34,
+    "Game":[{
+        "GameId":"SMG_fireAndRosesJoker",
+        "Ename":"Fire and Roses Joker",
+        "Cname":"火焰与玫瑰小丑",
+        "Reel":"5",
+        "PayLine":"720",
+        "RTP":"96.01%",
+        "Fun":2
+    },{
+        "GameId":"SMG_happyLuckyCats",
+        "Ename":"Happy Lucky Cats",
+        "Cname":"快乐招财猫",
+        "Reel":"3",
+        "PayLine":"5",
+        "RTP":"96.46%",
+        "Fun":2
+    },{
+        "GameId":"SMG_chestsOfGold",
+        "Ename":"Chests of Gold Power Combo",
+        "Cname":"黄金宝箱 POWER COMBO",
+        "Reel":"5",
+        "PayLine":"40",
+        "RTP":"96.40%",
+        "Fun":2
+    },{
+        "GameId":"SMG_wildfireWinsExtreme",
+        "Ename":"Wildfire Wins Extreme",
+        "Cname":"极度野火奖金",
+        "Reel":"5",
+        "PayLine":"50",
+        "RTP":"96.18%",
+        "Fun":2
+    }]
+}
