@@ -50,7 +50,8 @@ namespace ThirdPartyTool.Services
                 new Dictionary<ActionType, Action<IEnumerable<TpCustInfoModel>, int>>
                 {
                     { ActionType.KickUsers, KickUsers },
-                    { ActionType.TransferBack, TransferBack }
+                    { ActionType.TransferBack, TransferBack },
+                    { ActionType.GetBalance, GetBalance }
                 };
         }
 
@@ -67,13 +68,13 @@ namespace ThirdPartyTool.Services
                 {
                     case ActionType.KickUsers:
                     case ActionType.TransferBack:
+                    case ActionType.GetBalance:
                         DoAction(action, tpId);
                         break;
 
                     case ActionType.TransferRetry:
                         TransferRetry(tpId);
                         break;
-
                     default:
                         Console.WriteLine("Do not support: " + strAction);
                         break;
@@ -195,6 +196,21 @@ namespace ThirdPartyTool.Services
                 var str = $"SiteId,CustId,UserName,RemainAmount{Environment.NewLine}" +
                     string.Join(Environment.NewLine,
                         remainList.Select(x => $"{x.SiteId},{x.CustId},{x.UserName},{x.RemainAmount}"));
+
+                AppendToFileEnd(fileName, str);
+            }
+        }
+
+        private void GetBalance(IEnumerable<TpCustInfoModel> custInfoList, int tpId)
+        {
+            var tpHelper = _tpHandler[tpId];
+            var result = tpHelper.GetBalance(custInfoList, _taskCount);
+
+            if (result.Any())
+            {
+                var fileName = $"UserBalance_{_yyyyMMddHHmm}.csv";
+                var str = string.Join(Environment.NewLine,
+                        result.Where(a=>a.balance>0).Select(x => $"{x.TpUserName},{x.UserName},{x.Currency},{x.balance},{x.RawMessage}"));
 
                 AppendToFileEnd(fileName, str);
             }
@@ -367,11 +383,11 @@ namespace ThirdPartyTool.Services
         
         private void AppendToFileEnd(string fileName, string str)
         {
-            var fullPath = $"{_path}/{fileName}";
+            var fullPath = Path.Combine(_path, fileName);
             if (!File.Exists(fileName))
             {
                 Directory.CreateDirectory(_path);
-                File.WriteAllText($"{_path}/{fileName}", str);
+                File.WriteAllText(fullPath, str);
             }
             else
             {

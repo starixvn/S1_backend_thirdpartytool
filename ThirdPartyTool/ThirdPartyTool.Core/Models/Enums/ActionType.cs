@@ -13,6 +13,9 @@ namespace ThirdPartyTool.Core.Models.Enums
         [Description("Transfer retry")]
         TransferRetry = 2,
 
+        [Description("Get Balance")]
+        GetBalance = 3,
+
         [Description("Exit")]
         Exit = -1,
 
