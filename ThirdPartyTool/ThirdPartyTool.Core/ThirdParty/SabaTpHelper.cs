@@ -475,6 +475,11 @@ namespace ThirdPartyTool.Core.ThirdParty
         private ThirdPartyModel GetThirdPartyModel(int siteId)
             => _thirdPartyModel.TryGetValue(siteId, out var result) ? result : _thirdPartyModel[0];
 
+        public IEnumerable<UserBalance> GetBalance(IEnumerable<TpCustInfoModel> todoList, int taskCount)
+        {
+            throw new NotImplementedException();
+        }
+
         #endregion
     }
 }
