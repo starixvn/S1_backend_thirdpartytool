@@ -1,5 +1,4 @@
 ﻿using Dapper;
-using System.ComponentModel.DataAnnotations;
 using System.Data.Common;
 namespace SlotGameGenerator
 {

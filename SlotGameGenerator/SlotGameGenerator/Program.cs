@@ -1,5 +1,4 @@
 ﻿// See https://aka.ms/new-console-template for more information
-using Google.Protobuf.WellKnownTypes;
 using MySql.Data.MySqlClient;
 using SlotGameGenerator;
 using System.Text.Json;
@@ -44,7 +43,7 @@ static void CreateSlotGame(int nextId, SlotGame slotGame, Action<string> write)
     var values = "";
     foreach (var game in slotGame.Game)
     {
-        values += $"\r\n({nextId}, {slotGame.TpId}, 2, 1, '{game.GameId}', '{game.GameId}', {game.Fun}, 0),";
+        values += $"\r\n({nextId}, {slotGame.TpId}, 2, 1, '{game.GameId}', '{game.GameId}', {game.Fun}, {game.Device}),";
         nextId++;
     }
     values = values.TrimEnd(',') + ";";
@@ -57,7 +56,7 @@ static void CreateGameCasinoExtra(int nextId, SlotGame slotGame, Action<string> 
     var values = "";
     foreach (var game in slotGame.Game)
     {
-        values += $"\r\n({slotGame.TpId}, {nextId}, {game.Reel}, '{game.PayLine}', '{game.RTP}'),";
+        values += $"\r\n({slotGame.TpId}, {nextId}, '{game.Reel}', '{game.PayLine}', '{game.RTP}'),";
         nextId++;
     }
     values = values.TrimEnd(',') + ";";
@@ -119,6 +118,7 @@ public class Game
     public string PayLine { get; set; }
     public string RTP { get; set; }
     public int Fun { get; set; }
+    public int Device { get; set; }
 }
 
 public class SlotGame
