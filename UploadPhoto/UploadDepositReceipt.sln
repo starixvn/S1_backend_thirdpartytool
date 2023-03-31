@@ -1,6 +1,6 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UploadPhoto", "UploadPhoto\UploadPhoto.csproj", "{7D3ABCA3-9FE8-4069-9078-32B0C1536636}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "UploadDepositReceipt", "UploadDepositReceipt\UploadDepositReceipt.csproj", "{7D3ABCA3-9FE8-4069-9078-32B0C1536636}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution

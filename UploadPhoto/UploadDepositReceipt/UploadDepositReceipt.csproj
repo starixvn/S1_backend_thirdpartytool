@@ -5,13 +5,14 @@
         <TargetFramework>net6.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <RootNamespace>UploadPhoto</RootNamespace>
     </PropertyGroup>
 
     <ItemGroup>
-        <PackageReference Include="Amazon.S3" Version="0.26.0" />
-        <PackageReference Include="AWSSDK" Version="2.3.55.2" />
+        <PackageReference Include="AWSSDK.S3" Version="3.7.7.11" />
         <PackageReference Include="MySql.Data" Version="8.0.27" />
         <PackageReference Include="Dapper" Version="2.0.123" />
+        <PackageReference Include="System.Net.Http" Version="4.3.4" />
     </ItemGroup>
 
 </Project>

@@ -35,7 +35,7 @@ public class CustPhotoIdToS3
         };
         try
         {
-            _s3Client.PutObject(putRequest);
+            var a = _s3Client.PutObjectAsync(putRequest);
         }
         catch (Exception ex)
         {
