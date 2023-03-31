@@ -25,17 +25,17 @@ public class DepositReceiptService
         return result;
     }
     
-    public IEnumerable<DepositReceipt> GetDepositReceiptByTime()
+    public IEnumerable<DepositReceipt> GetDepositReceiptByTime(DateTime start , DateTime end)
     {
-        const string sql = "select concat('DD',DepositId) AS TransId, " +
-                           " ReceiptNo, " +
-                           "DepositPic " +
-                           "from DepositReceipt " +
-                           "where DepositId IN ( " +
-                           "select DepositId from DepositInfo " +
-                           "where CreateTime between '2022-04-01' and '2023-04-01' " +
-                           ") " +
-                           "order by DepositId desc , ReceiptNo asc ";
+         var sql = "select concat('DD',DepositId) AS TransId, " +
+                   " ReceiptNo, " +
+                   "DepositPic " +
+                   "from DepositReceipt " +
+                   "where DepositId IN ( " +
+                   "select DepositId from DepositInfo " +
+                   $"where CreateTime between '{start}' and '{end}' " +
+                   ") " +
+                   "order by DepositId desc , ReceiptNo asc ";
                 
         using var connection = new MySqlConnection(_connectionString);
         var result = connection.Query<DepositReceipt>(sql);

@@ -58,27 +58,40 @@ if (!string.IsNullOrEmpty(depositStr))
 }
 else
 {
-    Console.WriteLine($"Getting Data ... ");
-    var depositReceiptList = custPhotoSvc.GetDepositReceiptByTime();
 
-    if (depositReceiptList.Any())
+    Console.WriteLine($"Start ... ");
+    var startTime = new DateTime(2022, 07, 01);
+    var endTime = startTime.AddDays(1);
+    do
     {
-        Console.WriteLine($"Getting Data Done , Count:{depositReceiptList.Count()} ");
-        Console.WriteLine($"Start Uploading ");
-       
-        var count = 0;
-        foreach (var receipt in depositReceiptList)
+        var depositReceiptList = custPhotoSvc.GetDepositReceiptByTime(startTime,endTime);
+        Console.WriteLine($"Getting Data {startTime:yyyy-MM-dd} to {endTime:yyyy-MM-dd} ");
+        
+        if (depositReceiptList.Any())
         {
-            if (receipt.DepositPic is not null)
+            Console.WriteLine($"Getting Data Done , Count:{depositReceiptList.Count()} ");
+            Console.WriteLine($"Start Uploading ");
+
+            var count = 0;
+            foreach (var receipt in depositReceiptList)
             {
-                photoIdToS3.UploadDepositReceipt(receipt);
-                count += 1;
+                if (receipt.DepositPic is not null)
+                {
+                    photoIdToS3.UploadDepositReceipt(receipt);
+                    count += 1;
+                }
             }
+
+            photoIdToS3.ReUploadFailedList();
+
+            Console.WriteLine($"Finished DateRange.");
         }
 
-        photoIdToS3.ReUploadFailedList();
+        startTime = endTime;
+        endTime = endTime.AddDays(1);
         
-        Console.WriteLine($"Finished ,Count: {count} ");
-        
-    }
+    } while (startTime < DateTime.UtcNow) ;
+
+    Console.WriteLine($"Finished All.");
+    Console.ReadLine();
 }
