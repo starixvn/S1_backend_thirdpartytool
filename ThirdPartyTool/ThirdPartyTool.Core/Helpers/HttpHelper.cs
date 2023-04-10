@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -14,6 +15,7 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using Serilog.Context;
+using Serilog.Core;
 using ThirdPartyTool.Core.Exceptions;
 using ThirdPartyTool.Core.Extensions;
 using ThirdPartyTool.Core.Helpers.Interfaces;
@@ -221,10 +223,10 @@ namespace ThirdPartyTool.Core.Helpers
 
             if (request.Headers.Any())
             {
-                _logger.LogInformation("Headers:" 
+                _logger.LogInformation("Headers:"
                     + JsonConvert.SerializeObject(request.Headers.ToDictionary(x => x.Name, x => x.Value)));
             }
-            
+
             _logger.LogInformation(JsonConvert.SerializeObject(data));
             IFlurlResponse response = default(FlurlResponse);
             if (postType == ContentType.Json)
@@ -305,7 +307,63 @@ namespace ThirdPartyTool.Core.Helpers
             return (await stream, response.ResponseMessage.StatusCode);
         }
 
+        public async Task<string> HttpPostWithX509Async(string url, Dictionary<string, string> parameters,
+            string contentType, Dictionary<string, string> headers = null, X509Certificate2 certificate = null)
+        {
+            LogContext.PushProperty("url", url);
+            LogContext.PushProperty("contentType", contentType);
+            _logger.LogInformation($"headers: {JsonConvert.SerializeObject(headers)} " +
+                $"| parameters: {JsonConvert.SerializeObject(parameters)}" +
+                $"| certificate: {certificate.SubjectName} ");
 
+            using var handler = new HttpClientHandler();
+
+            if (certificate != null)
+            {
+                handler.ClientCertificates.Add(certificate);
+            }
+
+            //ignore Certificate
+            handler.ServerCertificateCustomValidationCallback = delegate { return true; };
+
+            using var client = new HttpClient(handler);
+            try
+            {
+                if (headers != null)
+                {
+                    foreach (var item in headers)
+                    {
+                        client.DefaultRequestHeaders.Add(item.Key, item.Value ?? string.Empty);
+                    }
+                }
+                var formData = new FormUrlEncodedContent(parameters);
+                var response = await client.PostAsync(url, formData);
+                var sb = response.Content.ReadAsStringAsync().Result;
+                _logger.LogInformation($"response: {sb}");
+                return sb;
+            }
+            catch (AggregateException ae)
+            {
+                foreach (var ex in ae.InnerExceptions)
+                {
+                    _logger.LogError(ex, ex.Message);
+                }
+                return ae.Message;
+            }
+            catch (HttpRequestException ex)
+            {
+                if (ex.InnerException != null)
+                {
+                    _logger.LogError(ex, ex.InnerException.Message);
+                }
+                return ex.Message;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, e.Message);
+                return e.Message;
+            }
+        }
     }
 
     internal class ContentType

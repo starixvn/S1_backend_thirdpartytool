@@ -1,5 +1,8 @@
-﻿using System;
+﻿using MySqlX.XDevAPI.Common;
+using System;
+using System.Collections.Generic;
 using System.Net;
+using System.Security.Cryptography.X509Certificates;
 using System.Threading.Tasks;
 using System.Xml.Linq;
 
@@ -33,5 +36,8 @@ namespace ThirdPartyTool.Core.Helpers.Interfaces
         IHttpHelper WithOAuthBearerToken(string token);
 
         IHttpHelper WithHeader(string key, string value);
+
+        Task<string> HttpPostWithX509Async(string url, Dictionary<string, string> parameters,
+            string contentType, Dictionary<string, string> headers = null, X509Certificate2 certificate = null);
     }
 }
