@@ -61,36 +61,46 @@ else
 
     Console.WriteLine($"Start ... ");
     var startTime = new DateTime(2022, 07, 01);
-    var endTime = startTime.AddDays(1);
-    do
+    try
     {
-        var depositReceiptList = custPhotoSvc.GetDepositReceiptByTime(startTime,endTime);
-        Console.WriteLine($"Getting Data {startTime:yyyy-MM-dd} to {endTime:yyyy-MM-dd} ");
-        
-        if (depositReceiptList.Any())
+        var endTime = startTime.AddDays(1);
+        do
         {
-            Console.WriteLine($"Getting Data Done , Count:{depositReceiptList.Count()} ");
-            Console.WriteLine($"Start Uploading ");
-
-            var count = 0;
-            foreach (var receipt in depositReceiptList)
+            var depositReceiptList = custPhotoSvc.GetDepositReceiptByTime(startTime,endTime);
+            Console.WriteLine($"Getting Data {startTime:yyyy-MM-dd} to {endTime:yyyy-MM-dd} ");
+        
+            if (depositReceiptList.Any())
             {
-                if (receipt.DepositPic is not null)
+                Console.WriteLine($"Getting Data Done , Count:{depositReceiptList.Count()} ");
+                Console.WriteLine($"Start Uploading ");
+
+                var count = 0;
+                foreach (var receipt in depositReceiptList)
                 {
-                    photoIdToS3.UploadDepositReceipt(receipt);
-                    count += 1;
+                    if (receipt.DepositPic is not null)
+                    {
+                        photoIdToS3.UploadDepositReceipt(receipt);
+                        count += 1;
+                    }
                 }
+
+                photoIdToS3.ReUploadFailedList();
+
+                Console.WriteLine($"Finished DateRange.");
+                Console.WriteLine($"");
             }
 
-            photoIdToS3.ReUploadFailedList();
-
-            Console.WriteLine($"Finished DateRange.");
-        }
-
-        startTime = endTime;
-        endTime = endTime.AddDays(1);
+            startTime = endTime;
+            endTime = endTime.AddDays(1);
         
-    } while (startTime < DateTime.UtcNow) ;
+        } while (startTime < DateTime.UtcNow) ;
+    }
+    catch (Exception e)
+    {
+        Console.WriteLine(e.Message);
+        throw;
+    }
+    
 
     Console.WriteLine($"Finished All.");
     Console.ReadLine();
