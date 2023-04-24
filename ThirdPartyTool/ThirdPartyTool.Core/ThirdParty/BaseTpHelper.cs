@@ -29,6 +29,11 @@ namespace ThirdPartyTool.Core.ThirdParty
         {
             return ReportDataLayer.GetTpAllCustInfoList(tpId, siteId);
         }
+        
+        public IEnumerable<TpCustInfoModel> GetTpInactiveCustInfoList(int tpId, int siteId, DateTimeOffset lastLoginTime)
+        {
+            return ReportDataLayer.GetTpInactiveCustInfoList(tpId, siteId, lastLoginTime);
+        }
 
         public IEnumerable<TpCustInfoModel> GetTpAllCustInfoByCust(int tpId, string jsonCustIds)
         {

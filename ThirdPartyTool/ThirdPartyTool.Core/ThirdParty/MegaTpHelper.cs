@@ -1,19 +1,11 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using MySqlX.XDevAPI.Common;
+﻿using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 using ThirdPartyTool.Core.Models;
 using ThirdPartyTool.Core.Models.Mega;
 using ThirdPartyTool.Core.ThirdParty.Interfaces;
-using Ubiety.Dns.Core;
 
 namespace ThirdPartyTool.Core.ThirdParty
 {
@@ -49,6 +41,12 @@ namespace ThirdPartyTool.Core.ThirdParty
         }
 
         public (IEnumerable<TransferBackFailedRecord> FailedRecords, IEnumerable<TransferRemainRecord> RemainRecords) ParallelTransferRetry(IEnumerable<TransferBackRetryModel> todoList, int taskCount)
+        {
+            throw new NotImplementedException();
+        }
+
+        public (IEnumerable<TransferBackFailedRecord> FailedRecords, IEnumerable<TransferRemainRecord> RemainRecords) ParallelKickUserAndTransferBack(IEnumerable<TpCustInfoModel> todoList,
+            int taskCount)
         {
             throw new NotImplementedException();
         }

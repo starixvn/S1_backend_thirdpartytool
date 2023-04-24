@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+﻿using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -58,82 +54,15 @@ namespace ThirdPartyTool.Core.ThirdParty
         public (IEnumerable<TransferBackFailedRecord> FailedRecords, IEnumerable<TransferRemainRecord> RemainRecords) ParallelTransferBack(
             IEnumerable<TpCustInfoModel> todoList, int taskCount)
         {
-            var failedList = new List<TransferBackFailedRecord>();
-            var remainList = new List<TransferRemainRecord>();
-            var tpBalanceInfoList = new List<CheckUserBalanceData>();
-
-            // Step 1: 取得沙巴餘額
-            try
-            {
-                tpBalanceInfoList = CheckUserBalanceAsync(todoList).Result.ToList();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, ex.Message);
-                failedList = todoList
-                    .Select(x => new TransferBackFailedRecord(x.CustId, string.Empty, "Get saba user balance failed."))
-                    .ToList();
-
-                return (failedList, remainList);
-            }
-            
-            Parallel.ForEach(todoList,
-                new ParallelOptions() { MaxDegreeOfParallelism = taskCount },
-                tpCustInfo =>
-                {
-                    var transId = string.Empty;
-                    try
-                    {
-                        var tpBalanceInfo =
-                            tpBalanceInfoList.FirstOrDefault(x => x.TpUserName == tpCustInfo.TpUserName);
-
-                        if (tpBalanceInfo == null)
-                            throw new CustomException($"{tpCustInfo.CustId} {tpCustInfo.TpUserName} TP balance info is null.");
-                       
-                        if (tpBalanceInfo.Balance <= 0)
-                            return;
-
-                        // Step 2: 餘額 < 1 時調整轉帳下限
-                        if (tpBalanceInfo.Balance < 1)
-                            _ = UpdateMinTransferAsync(tpCustInfo, tpCustInfo.SiteId, tpBalanceInfo.Balance).Result;
-                        
-                        // Step 3: 轉回沙巴餘額
-                        var transferAmount = tpBalanceInfo.Balance.ToOurAmount(tpCustInfo.ExchangeRate);
-                        var jsonTpBalanceInfo = JsonConvert.SerializeObject(tpBalanceInfo);
-                        var tpTransferInfo = new TpTransferInfoModel(tpCustInfo, transferAmount, jsonTpBalanceInfo);
-                        
-                        transId = base.CreateTpTransferInfo(tpTransferInfo);
-                        var (status, resp) = FundTransferAsync(tpCustInfo, tpTransferInfo, transId).Result;
-
-                        // 有殘餘轉不乾淨的金額
-                        if (resp.Data.AfterAmount > 0)
-                            remainList.Add(new TransferRemainRecord(tpCustInfo, resp.Data.AfterAmount));
-
-                        // 轉帳失敗不 Commit，Retry 檢查單號的時候再做
-                        if (status != TransferStatus.Success)
-                        {
-                            var msg = string.IsNullOrEmpty(resp.Message)
-                                ? resp.Message
-                                : status.ToString();
-
-                            failedList.Add(new TransferBackFailedRecord(tpCustInfo.CustId, transId, msg));
-
-                            return;
-                        }
-                        
-                        // Step 4: 更新轉帳結果
-                        CommitTransfer(tpCustInfo, transId, transferAmount, status, resp.Data.TransId);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError(ex, ex.Message);
-                        failedList.Add(new TransferBackFailedRecord(tpCustInfo.CustId, transId, ex.Message));
-                    }
-                });
-
-            return (failedList, remainList);
+            return ParallelDoTransferBack(todoList, taskCount, false);
         }
         
+        public (IEnumerable<TransferBackFailedRecord> FailedRecords, IEnumerable<TransferRemainRecord> RemainRecords)
+            ParallelKickUserAndTransferBack(IEnumerable<TpCustInfoModel> todoList, int taskCount)
+        {
+            return ParallelDoTransferBack(todoList, taskCount, true);
+        }
+
         public (IEnumerable<TransferBackFailedRecord> FailedRecords, IEnumerable<TransferRemainRecord> RemainRecords) ParallelTransferRetry(
             IEnumerable<TransferBackRetryModel> todoList, int taskCount)
         {
@@ -230,7 +159,7 @@ namespace ThirdPartyTool.Core.ThirdParty
         private async Task<bool> KickUserAsync(TpCustInfoModel tpCustInfo)
         {
             var tpSetting = GetThirdPartyModel(tpCustInfo.SiteId).TpSetting;
-            var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.KickUser;
+            var apiUrl = $"{tpSetting["ApiUrl"]}" + SabaPath.KickUser;
 
             var request = new Dictionary<string, string>
             {
@@ -266,7 +195,7 @@ namespace ThirdPartyTool.Core.ThirdParty
                     continue;
 
                 var tpSetting = GetThirdPartyModel(group.Key).TpSetting;
-                var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.CheckUserBalance;
+                var apiUrl = $"{tpSetting["ApiUrl"]}" + SabaPath.CheckUserBalance;
 
                 var tpUserNames = string.Join(",", group.Select(x => x.TpUserName));
                 var request = new Dictionary<string, string>
@@ -299,7 +228,7 @@ namespace ThirdPartyTool.Core.ThirdParty
         private async Task<(TransferStatus Status, FundTransferResp Resp)> FundTransferAsync(TpCustInfoModel tpCustInfo, TpTransferInfoModel tpTransferInfo, string transId)
         {
             var tpSetting = GetThirdPartyModel(tpCustInfo.SiteId).TpSetting;
-            var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.FundTransfer;
+            var apiUrl = $"{tpSetting["ApiUrl"]}" + SabaPath.FundTransfer;
             var amount = tpTransferInfo.Amount.ToTpAmount(tpCustInfo.ExchangeRate);
 
             var request = new Dictionary<string, string>
@@ -336,7 +265,7 @@ namespace ThirdPartyTool.Core.ThirdParty
         private async Task<(TransferStatus Status, CheckFundTransferResp Resp)> CheckFundTransferAsync(string transId, int siteId)
         {
             var tpSetting = GetThirdPartyModel(siteId).TpSetting;
-            var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.CheckFundTransfer;
+            var apiUrl = $"{tpSetting["ApiUrl"]}" + SabaPath.CheckFundTransfer;
 
             var request = new Dictionary<string, string>
             {
@@ -367,7 +296,7 @@ namespace ThirdPartyTool.Core.ThirdParty
         private async Task<bool> UpdateMinTransferAsync(TpCustInfoModel tpCustInfo, int siteId, decimal tpBalanceAmount)
         {
             var tpSetting = GetThirdPartyModel(siteId).TpSetting;
-            var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.UpdateMember;
+            var apiUrl = $"{tpSetting["ApiUrl"]}" + SabaPath.UpdateMember;
 
             var unit = tpBalanceAmount.ToString("##.###").Split('.').Last().Length;
             var minTransfer = (1 / (unit * 10)).ToString("##.###");
@@ -470,6 +399,91 @@ namespace ThirdPartyTool.Core.ThirdParty
                 throw new CustomException(
                     $"TransferId: {setTpTransferInfo.TransferId}, CustId:{tpCustInfo.CustId} ,CommitTpTransfer Exception.", ex);
             }
+        }
+        
+        private (IEnumerable<TransferBackFailedRecord> FailedRecords, IEnumerable<TransferRemainRecord> RemainRecords)
+            ParallelDoTransferBack(
+                IEnumerable<TpCustInfoModel> todoList, int taskCount, bool kickUser)
+        {
+            var failedList = new List<TransferBackFailedRecord>();
+            var remainList = new List<TransferRemainRecord>();
+            var tpBalanceInfoList = new List<CheckUserBalanceData>();
+
+            // Step 1: 取得沙巴餘額
+            try
+            {
+                tpBalanceInfoList = CheckUserBalanceAsync(todoList).Result.ToList();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogError(ex, ex.Message);
+                failedList = todoList
+                    .Select(x => new TransferBackFailedRecord(x.CustId, string.Empty, "Get saba user balance failed."))
+                    .ToList();
+
+                return (failedList, remainList);
+            }
+            
+            Parallel.ForEach(todoList,
+                new ParallelOptions { MaxDegreeOfParallelism = taskCount },
+                tpCustInfo =>
+                {
+                    var transId = string.Empty;
+                    try
+                    {
+                        if (kickUser)
+                        {
+                            _ = KickUserAsync(tpCustInfo);
+                        }
+                        
+                        var tpBalanceInfo =
+                            tpBalanceInfoList.FirstOrDefault(x => x.TpUserName == tpCustInfo.TpUserName);
+
+                        if (tpBalanceInfo == null)
+                            throw new CustomException($"{tpCustInfo.CustId} {tpCustInfo.TpUserName} TP balance info is null.");
+                       
+                        if (tpBalanceInfo.Balance <= 0)
+                            return;
+
+                        // Step 2: 餘額 < 1 時調整轉帳下限
+                        if (tpBalanceInfo.Balance < 1)
+                            _ = UpdateMinTransferAsync(tpCustInfo, tpCustInfo.SiteId, tpBalanceInfo.Balance).Result;
+                        
+                        // Step 3: 轉回沙巴餘額
+                        var transferAmount = tpBalanceInfo.Balance.ToOurAmount(tpCustInfo.ExchangeRate);
+                        var jsonTpBalanceInfo = JsonConvert.SerializeObject(tpBalanceInfo);
+                        var tpTransferInfo = new TpTransferInfoModel(tpCustInfo, transferAmount, jsonTpBalanceInfo);
+                        
+                        transId = base.CreateTpTransferInfo(tpTransferInfo);
+                        var (status, resp) = FundTransferAsync(tpCustInfo, tpTransferInfo, transId).Result;
+
+                        // 有殘餘轉不乾淨的金額
+                        if (resp.Data.AfterAmount > 0)
+                            remainList.Add(new TransferRemainRecord(tpCustInfo, resp.Data.AfterAmount));
+
+                        // 轉帳失敗不 Commit，Retry 檢查單號的時候再做
+                        if (status != TransferStatus.Success)
+                        {
+                            var msg = string.IsNullOrEmpty(resp.Message)
+                                ? resp.Message
+                                : status.ToString();
+
+                            failedList.Add(new TransferBackFailedRecord(tpCustInfo.CustId, transId, msg));
+
+                            return;
+                        }
+                        
+                        // Step 4: 更新轉帳結果
+                        CommitTransfer(tpCustInfo, transId, transferAmount, status, resp.Data.TransId);
+                    }
+                    catch (Exception ex)
+                    {
+                        Logger.LogError(ex, ex.Message);
+                        failedList.Add(new TransferBackFailedRecord(tpCustInfo.CustId, transId, ex.Message));
+                    }
+                });
+
+            return (failedList, remainList);
         }
         
         private ThirdPartyModel GetThirdPartyModel(int siteId)
