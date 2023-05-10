@@ -45,12 +45,6 @@ namespace ThirdPartyTool.Core.ThirdParty
             throw new NotImplementedException();
         }
 
-        public (IEnumerable<TransferBackFailedRecord> FailedRecords, IEnumerable<TransferRemainRecord> RemainRecords) ParallelKickUserAndTransferBack(IEnumerable<TpCustInfoModel> todoList,
-            int taskCount)
-        {
-            throw new NotImplementedException();
-        }
-
         public IEnumerable<UserBalance> GetBalance(IEnumerable<TpCustInfoModel> todoList, int taskCount)
         {
             var listBalance = new List<UserBalance>();
@@ -73,6 +67,11 @@ namespace ThirdPartyTool.Core.ThirdParty
                     }
                 });
             return listBalance;
+        }
+
+        public IEnumerable<AdjustBonusFailedRecord> AdjustBonus(IEnumerable<TpCustInfoModel> todoList)
+        {
+            throw new NotImplementedException();
         }
 
         private UserBalance GetBalance(TpCustInfoModel tpCustInfo) 

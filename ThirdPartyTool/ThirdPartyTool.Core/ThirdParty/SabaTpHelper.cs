@@ -86,7 +86,7 @@ namespace ThirdPartyTool.Core.ThirdParty
                         if (tpBalanceInfo == null)
                             throw new CustomException($"{tpCustInfo.CustId} {tpCustInfo.TpUserName} TP balance info is null.");
                        
-                        if (tpBalanceInfo.Balance <= 0)
+                        if (tpBalanceInfo.Balance <= 0 || tpCustInfo.IsTest)
                             return;
 
                         // Step 2: 餘額 < 1 時調整轉帳下限
@@ -119,6 +119,8 @@ namespace ThirdPartyTool.Core.ThirdParty
                         
                         // Step 4: 更新轉帳結果
                         CommitTransfer(tpCustInfo, transId, transferAmount, status, resp.Data.TransId);
+                    
+                        Task.Delay(200).Wait();
                     }
                     catch (Exception ex)
                     {
@@ -130,91 +132,6 @@ namespace ThirdPartyTool.Core.ThirdParty
             return (failedList, remainList);
         }
         
-        public (IEnumerable<TransferBackFailedRecord> FailedRecords, IEnumerable<TransferRemainRecord> RemainRecords)
-            ParallelKickUserAndTransferBack(IEnumerable<TpCustInfoModel> todoList, int taskCount)
-        {
-            var failedList = new List<TransferBackFailedRecord>();
-            var remainList = new List<TransferRemainRecord>();
-            var tpBalanceInfoList = new List<CheckUserBalanceData>();
-
-            // Step 1: 取得沙巴餘額
-            try
-            {
-                tpBalanceInfoList = CheckUserBalanceAsync(todoList).Result.ToList();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, ex.Message);
-                failedList = todoList
-                    .Select(x => new TransferBackFailedRecord(x.CustId, string.Empty, "Get saba user balance failed."))
-                    .ToList();
-
-                return (failedList, remainList);
-            }
-            
-            Parallel.ForEach(todoList,
-                new ParallelOptions { MaxDegreeOfParallelism = taskCount },
-                tpCustInfo =>
-                {
-                    var transId = string.Empty;
-                    try
-                    {
-                        var s = KickUserAsync(tpCustInfo).Result;
-                        if (!s)
-                        {
-                            Logger.LogError($"kick user failed: {tpCustInfo.UserName}");
-                        }
-                        
-                        var tpBalanceInfo =
-                            tpBalanceInfoList.FirstOrDefault(x => x.TpUserName == tpCustInfo.TpUserName);
-
-                        if (tpBalanceInfo == null)
-                            throw new CustomException($"{tpCustInfo.CustId} {tpCustInfo.TpUserName} TP balance info is null.");
-                       
-                        if (tpBalanceInfo.Balance <= 0)
-                            return;
-
-                        // Step 2: 餘額 < 1 時調整轉帳下限
-                        if (tpBalanceInfo.Balance < 1)
-                            _ = UpdateMinTransferAsync(tpCustInfo, tpCustInfo.SiteId, tpBalanceInfo.Balance).Result;
-                        
-                        // Step 3: 轉回沙巴餘額
-                        var transferAmount = tpBalanceInfo.Balance.ToOurAmount(tpCustInfo.ExchangeRate);
-                        var jsonTpBalanceInfo = JsonConvert.SerializeObject(tpBalanceInfo);
-                        var tpTransferInfo = new TpTransferInfoModel(tpCustInfo, transferAmount, jsonTpBalanceInfo);
-                        
-                        transId = base.CreateTpTransferInfo(tpTransferInfo);
-                        var (status, resp) = FundTransferAsync(tpCustInfo, tpTransferInfo, transId).Result;
-
-                        // 有殘餘轉不乾淨的金額
-                        if (resp.Data.AfterAmount > 0)
-                            remainList.Add(new TransferRemainRecord(tpCustInfo, resp.Data.AfterAmount));
-
-                        // 轉帳失敗不 Commit，Retry 檢查單號的時候再做
-                        if (status != TransferStatus.Success)
-                        {
-                            var msg = string.IsNullOrEmpty(resp.Message)
-                                ? resp.Message
-                                : status.ToString();
-
-                            failedList.Add(new TransferBackFailedRecord(tpCustInfo.CustId, transId, msg));
-
-                            return;
-                        }
-                        
-                        // Step 4: 更新轉帳結果
-                        CommitTransfer(tpCustInfo, transId, transferAmount, status, resp.Data.TransId);
-                    }
-                    catch (Exception ex)
-                    {
-                        Logger.LogError(ex, ex.Message);
-                        failedList.Add(new TransferBackFailedRecord(tpCustInfo.CustId, transId, ex.Message));
-                    }
-                });
-
-            return (failedList, remainList);
-        }
-
         public (IEnumerable<TransferBackFailedRecord> FailedRecords, IEnumerable<TransferRemainRecord> RemainRecords) ParallelTransferRetry(
             IEnumerable<TransferBackRetryModel> todoList, int taskCount)
         {
@@ -559,6 +476,46 @@ namespace ThirdPartyTool.Core.ThirdParty
         public IEnumerable<UserBalance> GetBalance(IEnumerable<TpCustInfoModel> todoList, int taskCount)
         {
             throw new NotImplementedException();
+        }
+
+        public IEnumerable<AdjustBonusFailedRecord> AdjustBonus(IEnumerable<TpCustInfoModel> todoList)
+        {
+            var failedList = new List<AdjustBonusFailedRecord>();
+            
+            using var conn = MainDbDataLayer.GetMySqlConnection();
+            conn.Open();
+            
+            foreach (var custInfo in todoList)
+            {
+                var trans = conn.BeginTransaction();
+                try
+                {
+                    Console.WriteLine($"{custInfo.SiteId}, {custInfo.CustId}, {custInfo.UserName}");
+                    var result = MainDbDataLayer.SabaBonusAdjust(custInfo.CustId, trans);
+
+                    if (result < 1)
+                    {
+                        failedList.Add(new AdjustBonusFailedRecord(custInfo.CustId, "Update failed."));
+                    }
+                    else
+                    {
+                        trans.Commit();
+                    }
+                    
+                    Task.Delay(200).Wait();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, custInfo.ToString());
+                    failedList.Add(new AdjustBonusFailedRecord(custInfo.CustId, ex.Message));
+                }
+                finally
+                {
+                    trans.Dispose();
+                }
+            }
+
+            return failedList;
         }
 
         #endregion

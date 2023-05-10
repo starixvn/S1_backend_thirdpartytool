@@ -80,7 +80,15 @@ namespace ThirdPartyTool.Core.DataLayers
 
             return _dbClient.QueryFirst<decimal>("Service_SabaBonus_Set", trans, parameter);
         }
+        
+        public decimal SabaBonusAdjust(int custId, IDbTransaction trans)
+        {
+            var parameter = new DynamicParameters();
+            parameter.Add("CustId", custId);
 
+            return _dbClient.Execute("Service_SabaBonus_Adjust_V2", trans, parameter);
+        }
+        
         public MySqlConnection GetMySqlConnection()
         {
             return _dbClient.GetMySqlConnection();

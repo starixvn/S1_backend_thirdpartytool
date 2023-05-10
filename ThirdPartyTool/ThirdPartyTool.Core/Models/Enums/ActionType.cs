@@ -16,8 +16,8 @@ namespace ThirdPartyTool.Core.Models.Enums
         [Description("Get Balance")]
         GetBalance = 3,
         
-        [Description("Kick users and transfer back")]
-        KickUserAndTransferBack = 4,
+        [Description("Adjust bonus")]
+        AdjustBonus = 5,
 
         [Description("Exit")]
         Exit = -1,

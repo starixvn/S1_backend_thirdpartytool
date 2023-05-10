@@ -61,15 +61,12 @@ namespace ThirdPartyTool.Core.DataLayers
             return _dbClient.Query<TpCustInfoModel>(sql, parameters: parameter, commandType: CommandType.Text);
         }
         
-        /// <summary>
-        /// 取得指定第三方有交易紀錄但一段時間沒上線的客戶資訊清單
-        /// </summary>
-        public IEnumerable<TpCustInfoModel> GetTpInactiveCustInfoList(int tpId, int siteId, DateTimeOffset lastLoginTime)
+        public IEnumerable<TpCustInfoModel> GetSpecificConditionCustInfoList(int tpId, int siteId)
         {
             var parameter = new DynamicParameters();
             parameter.Add("_TpId", tpId);
             parameter.Add("_SiteId", siteId);
-            parameter.Add("_LastLoginTime", lastLoginTime.UtcDateTime);
+            parameter.Add("_LastLoginTime", new DateTimeOffset(2023, 3, 1, 0, 0, 0,TimeSpan.Zero));
             var sql = @"
                 SELECT
                     TC.TpId,
@@ -93,7 +90,7 @@ namespace ThirdPartyTool.Core.DataLayers
                 WHERE TC.TpId = @_TpId
 		            AND TC.SiteId = @_SiteId
                     AND TC.LastTradingTime IS NOT NULL
-                    AND C.LastLoginTime <= @_LastLoginTime;";
+                    AND C.LastLoginTime >= @_LastLoginTime;";
             
             return _dbClient.Query<TpCustInfoModel>(sql, parameters: parameter, commandType: CommandType.Text);
         }
