@@ -207,7 +207,7 @@ namespace ThirdPartyTool.Services
                 var str = string.Join(Environment.NewLine,
                         failedList.Select(x => $"{x.CustId}|{x.TransId}|{x.Message}"));
 
-                AppendToFileEnd(fileName, str);
+                AppendToFileEnd(fileName, Environment.NewLine + str);
             }
 
             if (remainList.Any())
@@ -217,34 +217,7 @@ namespace ThirdPartyTool.Services
                     string.Join(Environment.NewLine,
                         remainList.Select(x => $"{x.SiteId},{x.CustId},{x.UserName},{x.RemainAmount}"));
 
-                AppendToFileEnd(fileName, str);
-            }
-        }
-        
-        private void KickUserAndTransferBack(IEnumerable<TpCustInfoModel> custInfoList, int tpId)
-        {
-            var tpHelper = _tpHandler[tpId];
-            var result = tpHelper.ParallelTransferBack(custInfoList, _taskCount);
-            var failedList = result.FailedRecords;
-            var remainList = result.RemainRecords;
-
-            if (failedList.Any())
-            {
-                var fileName = $"transfer_failed_{_yyyyMMddHHmm}.txt";
-                var str = string.Join(Environment.NewLine,
-                    failedList.Select(x => $"{x.CustId}|{x.TransId}|{x.Message}"));
-
-                AppendToFileEnd(fileName, str);
-            }
-
-            if (remainList.Any())
-            {
-                var fileName = $"transfer_remain_{_yyyyMMddHHmm}.csv";
-                var str = $"SiteId,CustId,UserName,RemainAmount{Environment.NewLine}" +
-                          string.Join(Environment.NewLine,
-                              remainList.Select(x => $"{x.SiteId},{x.CustId},{x.UserName},{x.RemainAmount}"));
-
-                AppendToFileEnd(fileName, str);
+                AppendToFileEnd(fileName, Environment.NewLine + str);
             }
         }
 
@@ -337,7 +310,7 @@ namespace ThirdPartyTool.Services
                     var str = string.Join(Environment.NewLine,
                         failedList.Select(x => $"{x.CustId}|{x.TransId}|{x.Message}"));
 
-                    AppendToFileEnd(fileName, str);
+                    AppendToFileEnd(fileName, Environment.NewLine + str);
                 }
 
                 if (remainList.Any())
@@ -347,7 +320,10 @@ namespace ThirdPartyTool.Services
                               string.Join(Environment.NewLine,
                                   remainList.Select(x => $"{x.SiteId},{x.CustId},{x.UserName},{x.RemainAmount}"));
 
-                    AppendToFileEnd(fileName, str);
+                    if (index > 0)
+                        str = Environment.NewLine + str;
+                    
+                    AppendToFileEnd(fileName, Environment.NewLine + str);
                 }
 
                 index++;
@@ -379,7 +355,9 @@ namespace ThirdPartyTool.Services
         private IEnumerable<TransferBackRetryModel> GetTransferBackRetryList()
         {
             var strRecords = ReadStringFromInputFilePath();
-            var records = strRecords.Split(Environment.NewLine)
+            var records = strRecords
+                .Split(Environment.NewLine)
+                .Skip(1)
                 .Select(x =>
                 {
                     var item = x.Split('|');
