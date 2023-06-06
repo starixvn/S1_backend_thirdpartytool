@@ -1,8 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text.RegularExpressions;
-using System.Threading.Tasks;
+﻿using System.Text.RegularExpressions;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
@@ -78,7 +74,7 @@ namespace ThirdPartyTool.Core.ThirdParty
             }
             
             Parallel.ForEach(todoList,
-                new ParallelOptions() { MaxDegreeOfParallelism = taskCount },
+                new ParallelOptions { MaxDegreeOfParallelism = taskCount },
                 tpCustInfo =>
                 {
                     var transId = string.Empty;
@@ -90,7 +86,7 @@ namespace ThirdPartyTool.Core.ThirdParty
                         if (tpBalanceInfo == null)
                             throw new CustomException($"{tpCustInfo.CustId} {tpCustInfo.TpUserName} TP balance info is null.");
                        
-                        if (tpBalanceInfo.Balance <= 0)
+                        if (tpBalanceInfo.Balance <= 0 || tpCustInfo.IsTest)
                             return;
 
                         // Step 2: 餘額 < 1 時調整轉帳下限
@@ -123,6 +119,8 @@ namespace ThirdPartyTool.Core.ThirdParty
                         
                         // Step 4: 更新轉帳結果
                         CommitTransfer(tpCustInfo, transId, transferAmount, status, resp.Data.TransId);
+                    
+                        Task.Delay(200).Wait();
                     }
                     catch (Exception ex)
                     {
@@ -230,7 +228,7 @@ namespace ThirdPartyTool.Core.ThirdParty
         private async Task<bool> KickUserAsync(TpCustInfoModel tpCustInfo)
         {
             var tpSetting = GetThirdPartyModel(tpCustInfo.SiteId).TpSetting;
-            var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.KickUser;
+            var apiUrl = $"{tpSetting["ApiUrl"]}" + SabaPath.KickUser;
 
             var request = new Dictionary<string, string>
             {
@@ -266,7 +264,7 @@ namespace ThirdPartyTool.Core.ThirdParty
                     continue;
 
                 var tpSetting = GetThirdPartyModel(group.Key).TpSetting;
-                var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.CheckUserBalance;
+                var apiUrl = $"{tpSetting["ApiUrl"]}" + SabaPath.CheckUserBalance;
 
                 var tpUserNames = string.Join(",", group.Select(x => x.TpUserName));
                 var request = new Dictionary<string, string>
@@ -299,7 +297,7 @@ namespace ThirdPartyTool.Core.ThirdParty
         private async Task<(TransferStatus Status, FundTransferResp Resp)> FundTransferAsync(TpCustInfoModel tpCustInfo, TpTransferInfoModel tpTransferInfo, string transId)
         {
             var tpSetting = GetThirdPartyModel(tpCustInfo.SiteId).TpSetting;
-            var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.FundTransfer;
+            var apiUrl = $"{tpSetting["ApiUrl"]}" + SabaPath.FundTransfer;
             var amount = tpTransferInfo.Amount.ToTpAmount(tpCustInfo.ExchangeRate);
 
             var request = new Dictionary<string, string>
@@ -336,7 +334,7 @@ namespace ThirdPartyTool.Core.ThirdParty
         private async Task<(TransferStatus Status, CheckFundTransferResp Resp)> CheckFundTransferAsync(string transId, int siteId)
         {
             var tpSetting = GetThirdPartyModel(siteId).TpSetting;
-            var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.CheckFundTransfer;
+            var apiUrl = $"{tpSetting["ApiUrl"]}" + SabaPath.CheckFundTransfer;
 
             var request = new Dictionary<string, string>
             {
@@ -367,7 +365,7 @@ namespace ThirdPartyTool.Core.ThirdParty
         private async Task<bool> UpdateMinTransferAsync(TpCustInfoModel tpCustInfo, int siteId, decimal tpBalanceAmount)
         {
             var tpSetting = GetThirdPartyModel(siteId).TpSetting;
-            var apiUrl = $"{tpSetting["ApiUrl"]}" + Path.UpdateMember;
+            var apiUrl = $"{tpSetting["ApiUrl"]}" + SabaPath.UpdateMember;
 
             var unit = tpBalanceAmount.ToString("##.###").Split('.').Last().Length;
             var minTransfer = (1 / (unit * 10)).ToString("##.###");
@@ -478,6 +476,46 @@ namespace ThirdPartyTool.Core.ThirdParty
         public IEnumerable<UserBalance> GetBalance(IEnumerable<TpCustInfoModel> todoList, int taskCount)
         {
             throw new NotImplementedException();
+        }
+
+        public IEnumerable<AdjustBonusFailedRecord> AdjustBonus(IEnumerable<TpCustInfoModel> todoList)
+        {
+            var failedList = new List<AdjustBonusFailedRecord>();
+            
+            using var conn = MainDbDataLayer.GetMySqlConnection();
+            conn.Open();
+            
+            foreach (var custInfo in todoList)
+            {
+                var trans = conn.BeginTransaction();
+                try
+                {
+                    Console.WriteLine($"{custInfo.SiteId}, {custInfo.CustId}, {custInfo.UserName}");
+                    var result = MainDbDataLayer.SabaBonusAdjust(custInfo.CustId, trans);
+
+                    if (result < 1)
+                    {
+                        failedList.Add(new AdjustBonusFailedRecord(custInfo.CustId, "Update failed."));
+                    }
+                    else
+                    {
+                        trans.Commit();
+                    }
+                    
+                    Task.Delay(200).Wait();
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, custInfo.ToString());
+                    failedList.Add(new AdjustBonusFailedRecord(custInfo.CustId, ex.Message));
+                }
+                finally
+                {
+                    trans.Dispose();
+                }
+            }
+
+            return failedList;
         }
 
         #endregion

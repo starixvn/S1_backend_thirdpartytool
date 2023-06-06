@@ -34,6 +34,11 @@ namespace ThirdPartyTool.Core.ThirdParty
         {
             return ReportDataLayer.GetTpAllCustInfoList(tpId, siteId);
         }
+        
+        public IEnumerable<TpCustInfoModel> GetSpecificConditionCustInfoList(int tpId, int siteId)
+        {
+            return ReportDataLayer.GetSpecificConditionCustInfoList(tpId, siteId);
+        }
 
         public IEnumerable<TpCustInfoModel> GetTpAllCustInfoByCust(int tpId, string jsonCustIds)
         {

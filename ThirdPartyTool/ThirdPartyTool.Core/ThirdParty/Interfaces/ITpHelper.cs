@@ -18,5 +18,7 @@ namespace ThirdPartyTool.Core.ThirdParty.Interfaces
             ParallelTransferRetry(IEnumerable<TransferBackRetryModel> todoList, int taskCount);
 
         IEnumerable<UserBalance> GetBalance(IEnumerable<TpCustInfoModel> todoList, int taskCount);
+
+        IEnumerable<AdjustBonusFailedRecord> AdjustBonus(IEnumerable<TpCustInfoModel> todoList);
     }
 }

@@ -1,14 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Diagnostics;
-using System.IO;
-using System.Linq;
-using System.Threading;
-using System.Threading.Tasks;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
-using Microsoft.Extensions.Logging;
+﻿using System.Diagnostics;
 using Newtonsoft.Json;
 using ThirdPartyTool.Core.Extensions;
 using ThirdPartyTool.Core.Models;
@@ -18,13 +8,19 @@ using ThirdPartyTool.Core.ThirdParty.Interfaces;
 
 namespace ThirdPartyTool.Services
 {
-    public class SwitchToolService : IHostedService
+    public class SwitchToolService
     {
         private readonly ILogger<SwitchToolService> _logger;
         private readonly BaseTpHelper _baseTpHelper;
         private readonly IEnumerable<int> _supportSiteIds;
-        private readonly Dictionary<int, ITpHelper> _tpHandler = new Dictionary<int, ITpHelper>();
+        private readonly Dictionary<int, ITpHelper> _tpHandler = new();
         private readonly Dictionary<ActionType, Action<IEnumerable<TpCustInfoModel>, int>> _actionHandler;
+        private static readonly Dictionary<string, string> TargetMenu = new()
+        {
+            {"0", "All users"},
+            {"1", "Specific users"},
+            {"2", "Specific users by CustId"}
+        };
         private readonly int _batchCount;
         private readonly int _taskCount;
         private readonly string _path;
@@ -51,11 +47,12 @@ namespace ThirdPartyTool.Services
                 {
                     { ActionType.KickUsers, KickUsers },
                     { ActionType.TransferBack, TransferBack },
-                    { ActionType.GetBalance, GetBalance }
+                    { ActionType.GetBalance, GetBalance },
+                    { ActionType.AdjustBonus, AdjustBonus }
                 };
         }
 
-        public Task StartAsync(CancellationToken cancellationToken)
+        public Task StartAsync()
         {
             var tpId = GetInputTpId();
             PrintMenu();
@@ -69,6 +66,7 @@ namespace ThirdPartyTool.Services
                     case ActionType.KickUsers:
                     case ActionType.TransferBack:
                     case ActionType.GetBalance:
+                    case ActionType.AdjustBonus:
                         DoAction(action, tpId);
                         break;
 
@@ -88,56 +86,78 @@ namespace ThirdPartyTool.Services
             return Task.CompletedTask;
         }
 
-        public Task StopAsync(CancellationToken cancellationToken)
-        {
-            return Task.CompletedTask;
-        }
-
         #region Private
 
         private void DoAction(ActionType action, int tpId)
         {
-            var isSpecific = GetIsSpecific();
+            var target = GetTargetOption();
+
+            
+            switch (target)
+            {
+                
+                case "0":
+                case "1":
+                    Process(action, tpId, target);
+                    
+                    break;
+                case "2":
+                    ProcessSpecialList(action, tpId);
+                    
+                    break;
+            }
+        }
+        
+        private void Process(ActionType action, int tpId, string target)
+        {
             var actionDesc = action.GetDescription();
             var stopWatch = new Stopwatch();
+            var totalCount = 0;
+            var totalCost = TimeSpan.Zero;
+            
+            Console.WriteLine($"Will do {actionDesc} for sites: {string.Join(",", _supportSiteIds)}");
+            if (!Confirm())
+                return;
 
-            if (isSpecific)
+            foreach (var siteId in _supportSiteIds)
             {
-                var list = GetSpecificCustInfoList(tpId);
-
-                Console.WriteLine($"The specific custom list to {actionDesc}:");
-                Console.WriteLine("\tSiteId, CustId, UserName");
-                foreach (var cust in list)
-                    Console.WriteLine($"\t{cust.SiteId}, {cust.CustId}, {cust.UserName}");
-       
-                if (!Confirm())
-                    return;
-
-                stopWatch.Start();
-                _logger.LogInformation($"=== Start specific {actionDesc} ===");
+                stopWatch.Restart();
+                
+                _logger.LogInformation($"=== Start {actionDesc}, siteId: {siteId} ===");
+                var list = target == "0"
+                    ? _baseTpHelper.GeTptAllCustInfoList(tpId, siteId)
+                    : _baseTpHelper.GetSpecificConditionCustInfoList(tpId, siteId);
+                var count = list.Count();
                 BatchDoAction(action, list, tpId);
-                _logger.LogInformation($"=== End specific {actionDesc}, total count: {list.Count()}, cost: {stopWatch.Elapsed:g} ===");
+                
+                stopWatch.Stop();
+                _logger.LogInformation($"=== End {actionDesc}, siteId: {siteId}, count: {count}, total cost: {stopWatch.Elapsed:g} ===");
+                totalCount += count;
+                totalCost += stopWatch.Elapsed;
             }
-            else
-            {
-                Console.WriteLine($"Will do {actionDesc} for sites: {string.Join(",", _supportSiteIds)}");
-                if (!Confirm())
-                    return;
 
-                stopWatch.Start();
-                var totalCount = 0;
-                foreach (var siteId in _supportSiteIds)
-                {
-                    _logger.LogInformation($"=== Start {actionDesc}, siteId: {siteId} ===");
-                    var list = _baseTpHelper.GeTptAllCustInfoList(tpId, siteId);
-                    var count = list.Count();
-                    BatchDoAction(action, list, tpId);
-                    _logger.LogInformation($"=== End {actionDesc}, siteId: {siteId}, count: {count}, total cost: {stopWatch.Elapsed:g} ===");
-                    totalCount += count;
-                }
+            _logger.LogInformation($"=== {actionDesc} End, total count: {totalCount}, total cost: {totalCost:g}  ===");
+        }
+        
+        private void ProcessSpecialList(ActionType action, int tpId)
+        {
+            var actionDesc = action.GetDescription();
+            var stopWatch = new Stopwatch();
+            stopWatch.Start();
+            
+            Console.WriteLine($"The specific custom list to {actionDesc}:");
+            Console.WriteLine("\tSiteId, CustId, UserName");
+            
+            var custInfoList = GetSpecificCustInfoList(tpId);
+            foreach (var cust in custInfoList)
+                Console.WriteLine($"\t{cust.SiteId}, {cust.CustId}, {cust.UserName}");
+       
+            if (!Confirm())
+                return;
 
-                _logger.LogInformation($"=== {actionDesc} End, total count: {totalCount} ===");
-            }
+            _logger.LogInformation($"=== Start specific {actionDesc} ===");
+            BatchDoAction(action, custInfoList, tpId);
+            _logger.LogInformation($"=== End specific {actionDesc}, total count: {custInfoList.Count()}, cost: {stopWatch.Elapsed:g} ===");
         }
 
         private void BatchDoAction(ActionType action, IEnumerable<TpCustInfoModel> custInfoList, int tpId)
@@ -187,7 +207,7 @@ namespace ThirdPartyTool.Services
                 var str = string.Join(Environment.NewLine,
                         failedList.Select(x => $"{x.CustId}|{x.TransId}|{x.Message}"));
 
-                AppendToFileEnd(fileName, str);
+                AppendToFileEnd(fileName, Environment.NewLine + str);
             }
 
             if (remainList.Any())
@@ -197,7 +217,7 @@ namespace ThirdPartyTool.Services
                     string.Join(Environment.NewLine,
                         remainList.Select(x => $"{x.SiteId},{x.CustId},{x.UserName},{x.RemainAmount}"));
 
-                AppendToFileEnd(fileName, str);
+                AppendToFileEnd(fileName, Environment.NewLine + str);
             }
         }
 
@@ -211,6 +231,25 @@ namespace ThirdPartyTool.Services
                 var fileName = $"UserBalance_{_yyyyMMddHHmm}.csv";
                 var str = string.Join(Environment.NewLine,
                         result.Where(a=>a.balance>0).Select(x => $"{x.TpUserName},{x.UserName},{x.Currency},{x.balance},{x.RawMessage}"));
+
+                AppendToFileEnd(fileName, str);
+            }
+        }
+        /// <summary>
+        /// 轉完後續要變動Bonus使用
+        /// </summary>
+        /// <param name="custInfoList"></param>
+        /// <param name="tpId">Sw TpId</param>
+        private void AdjustBonus(IEnumerable<TpCustInfoModel> custInfoList, int tpId)
+        {
+            var tpHelper = _tpHandler[tpId];
+            var failedRecords = tpHelper.AdjustBonus(custInfoList);
+
+            if (failedRecords.Any())
+            {
+                var fileName = $"adjust_bonus_failed_{_yyyyMMddHHmm}.txt";
+                var str = string.Join(Environment.NewLine,
+                    failedRecords.Select(x => $"{x.CustId}|{x.Message}"));
 
                 AppendToFileEnd(fileName, str);
             }
@@ -271,7 +310,7 @@ namespace ThirdPartyTool.Services
                     var str = string.Join(Environment.NewLine,
                         failedList.Select(x => $"{x.CustId}|{x.TransId}|{x.Message}"));
 
-                    AppendToFileEnd(fileName, str);
+                    AppendToFileEnd(fileName, Environment.NewLine + str);
                 }
 
                 if (remainList.Any())
@@ -281,7 +320,10 @@ namespace ThirdPartyTool.Services
                               string.Join(Environment.NewLine,
                                   remainList.Select(x => $"{x.SiteId},{x.CustId},{x.UserName},{x.RemainAmount}"));
 
-                    AppendToFileEnd(fileName, str);
+                    if (index > 0)
+                        str = Environment.NewLine + str;
+                    
+                    AppendToFileEnd(fileName, Environment.NewLine + str);
                 }
 
                 index++;
@@ -313,7 +355,9 @@ namespace ThirdPartyTool.Services
         private IEnumerable<TransferBackRetryModel> GetTransferBackRetryList()
         {
             var strRecords = ReadStringFromInputFilePath();
-            var records = strRecords.Split(Environment.NewLine)
+            var records = strRecords
+                .Split(Environment.NewLine)
+                .Skip(1)
                 .Select(x =>
                 {
                     var item = x.Split('|');
@@ -358,18 +402,18 @@ namespace ThirdPartyTool.Services
             return tpId;
         }
 
-        private static bool GetIsSpecific()
+        private static string GetTargetOption()
         {
-            Console.WriteLine("0: All users , 1: Specific users");
-            var strIsSpecific = Console.ReadLine();
+            Console.WriteLine(string.Join(", ", TargetMenu.Select(x => $"{x.Key}: {x.Value}")));
+            var target = Console.ReadLine();
 
-            while (strIsSpecific != "0" && strIsSpecific != "1")
+            while (!TargetMenu.ContainsKey(target ?? string.Empty))
             {
-                Console.WriteLine($"{strIsSpecific} not support, try again");
-                strIsSpecific = Console.ReadLine();
+                Console.WriteLine($"{target} not support, try again");
+                target = Console.ReadLine();
             };
 
-            return strIsSpecific == "1";
+            return target;
         }
 
         private static IEnumerable<string> GetSplitList(string str)
@@ -387,7 +431,7 @@ namespace ThirdPartyTool.Services
             if (!File.Exists(fileName))
             {
                 Directory.CreateDirectory(_path);
-                File.WriteAllText(fullPath, str);
+                File.AppendAllText(fullPath, str);
             }
             else
             {

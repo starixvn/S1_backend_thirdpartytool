@@ -9,12 +9,15 @@ namespace ThirdPartyTool.Core.Models.Enums
 
         [Description("Transfer back")]
         TransferBack = 1,
-
+        
         [Description("Transfer retry")]
         TransferRetry = 2,
 
         [Description("Get Balance")]
         GetBalance = 3,
+        
+        [Description("Adjust bonus")]
+        AdjustBonus = 5,
 
         [Description("Exit")]
         Exit = -1,

@@ -1,19 +1,11 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
-using MySqlX.XDevAPI.Common;
+﻿using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
-using System;
-using System.Collections.Generic;
-using System.Linq;
 using System.Net;
-using System.Net.Http;
 using System.Security.Cryptography;
 using System.Text;
-using System.Threading.Tasks;
 using ThirdPartyTool.Core.Models;
 using ThirdPartyTool.Core.Models.Mega;
 using ThirdPartyTool.Core.ThirdParty.Interfaces;
-using Ubiety.Dns.Core;
 
 namespace ThirdPartyTool.Core.ThirdParty
 {
@@ -75,6 +67,11 @@ namespace ThirdPartyTool.Core.ThirdParty
                     }
                 });
             return listBalance;
+        }
+
+        public IEnumerable<AdjustBonusFailedRecord> AdjustBonus(IEnumerable<TpCustInfoModel> todoList)
+        {
+            throw new NotImplementedException();
         }
 
         private UserBalance GetBalance(TpCustInfoModel tpCustInfo) 

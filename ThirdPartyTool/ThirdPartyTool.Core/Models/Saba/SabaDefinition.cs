@@ -46,7 +46,7 @@ namespace ThirdPartyTool.Core.Models.Saba
     }
 
 
-    internal class Path
+    internal class SabaPath
     {
         /// <summary>
         /// 登出 Saba 會員

@@ -1,16 +1,11 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using Flurl.Http;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Logging;
+﻿using Flurl.Http;
 using ThirdPartyTool.Core.DataLayers;
 using ThirdPartyTool.Core.Helpers;
 using ThirdPartyTool.Core.Helpers.Interfaces;
 using ThirdPartyTool.Core.Models.Enums;
 using ThirdPartyTool.Core.ThirdParty;
 using ThirdPartyTool.Core.ThirdParty.Interfaces;
+using ThirdPartyTool.Services;
 
 namespace ThirdPartyTool.Extensions
 {
@@ -20,8 +15,6 @@ namespace ThirdPartyTool.Extensions
         {
             var provider = services.BuildServiceProvider();
             var logger = provider.GetRequiredService<ILogger<MySqlClient>>();
-            //Console.WriteLine("=== ConnectionString ===");
-            //Console.WriteLine(configuration.GetConnectionString("ConnectionString"));
             return services
                 .AddSingleton(param =>
                     new MySqlClient(configuration.GetConnectionString("ConnectionString"), logger)
@@ -44,8 +37,6 @@ namespace ThirdPartyTool.Extensions
         {
             var proxyHost = configuration.GetValue<string>("ProxyHost");
             var proxyPort = configuration.GetValue<int>("ProxyPort");
-            //Console.WriteLine("=== Proxy ===");
-            //Console.WriteLine($"{proxyHost}:{proxyPort}");
             if (!string.IsNullOrEmpty(proxyHost))
             {
                 FlurlHttp.Configure(settings =>
@@ -59,7 +50,8 @@ namespace ThirdPartyTool.Extensions
                 .AddTransient<JsonNetSerializer, JsonNetSerializer>()
                 .AddTransient<MainDbDataLayer>()
                 .AddTransient<ReportDbDataLayer>()
-                .AddSingleton<ThirdPartyManager>();
+                .AddSingleton<ThirdPartyManager>()
+                .AddSingleton<SwitchToolService>();
         }
 
         public static IServiceCollection RegisterTpHelper(this IServiceCollection services, IConfiguration configuration)

@@ -15,7 +15,7 @@ namespace ThirdPartyTool.Core.DataLayers
 
         public ReportDbDataLayer(IServiceProvider provider)
         {
-            _dbClient = provider.GetServices<MySqlClient>().First(p => p.DataBase == DataBase.Report);
+            _dbClient = provider.GetServices<MySqlClient>().First(p => p.DataBase == DataBase.Main); //prd 防火牆只開 maindb，懶得改了
         }
 
         public IEnumerable<ThirdPartyModel> GetAllTpList()
@@ -57,6 +57,40 @@ namespace ThirdPartyTool.Core.DataLayers
                 WHERE TC.TpId = @_TpId
 		            AND TC.SiteId = @_SiteId
                     AND TC.LastTradingTime IS NOT NULL;";
+            
+            return _dbClient.Query<TpCustInfoModel>(sql, parameters: parameter, commandType: CommandType.Text);
+        }
+        
+        public IEnumerable<TpCustInfoModel> GetSpecificConditionCustInfoList(int tpId, int siteId)
+        {
+            var parameter = new DynamicParameters();
+            parameter.Add("_TpId", tpId);
+            parameter.Add("_SiteId", siteId);
+            parameter.Add("_LastLoginTime", new DateTimeOffset(2023, 3, 1, 0, 0, 0,TimeSpan.Zero));
+            var sql = @"
+                SELECT
+                    TC.TpId,
+                    TC.CustId,
+                    TC.SiteId,
+                    C.CurrencyId,
+                    TC.UserName,
+                    TC.TpUserName,
+                    TC.TpPwd,
+                    TCY.TpCurrencyId,
+                    TCY.ExchangeRate,
+                    C.IsTest,
+                    C.ActStatus,
+                    TC.`Status` AS TpCustStatus,
+                    C.`Status` AS CustStatus
+                FROM TpCurrency AS TCY
+                INNER JOIN Customer AS C
+                    ON C.CurrencyId = TCY.CurrencyId
+                RIGHT OUTER JOIN TpCustInfo AS TC
+                    ON TC.CustId = C.CustId AND TC.TpId = TCY.TpId
+                WHERE TC.TpId = @_TpId
+		            AND TC.SiteId = @_SiteId
+                    AND TC.LastTradingTime IS NOT NULL
+                    AND C.LastLoginTime >= @_LastLoginTime;";
             
             return _dbClient.Query<TpCustInfoModel>(sql, parameters: parameter, commandType: CommandType.Text);
         }
