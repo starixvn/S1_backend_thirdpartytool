@@ -37,7 +37,7 @@ namespace ThirdPartyTool.Core.Helpers.Interfaces
 
         IHttpHelper WithHeader(string key, string value);
 
-        Task<string> HttpPostWithX509Async(string url, Dictionary<string, string> parameters,
+        Task<(string Response, HttpStatusCode StatusCode)> HttpPostWithX509Async(string url, Dictionary<string, string> parameters,
             string contentType, Dictionary<string, string> headers = null, X509Certificate2 certificate = null);
     }
 }

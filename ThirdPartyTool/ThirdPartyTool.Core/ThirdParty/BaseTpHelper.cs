@@ -22,12 +22,11 @@ namespace ThirdPartyTool.Core.ThirdParty
 
         public BaseTpHelper(IServiceProvider provider)
         {
-            env = provider.GetRequiredService<IHostEnvironment>();
+            //env = provider.GetRequiredService<IHostEnvironment>();
             Logger = provider.GetRequiredService<ILogger<BaseTpHelper>>();
             HttpHelper = provider.GetRequiredService<IHttpHelper>();
             MainDbDataLayer = provider.GetRequiredService<MainDbDataLayer>();
             ReportDataLayer = provider.GetRequiredService<ReportDbDataLayer>();
-            ContentRootPath = env.ContentRootPath;
         }
 
         public IEnumerable<TpCustInfoModel> GeTptAllCustInfoList(int tpId, int siteId)

@@ -307,7 +307,7 @@ namespace ThirdPartyTool.Core.Helpers
             return (await stream, response.ResponseMessage.StatusCode);
         }
 
-        public async Task<string> HttpPostWithX509Async(string url, Dictionary<string, string> parameters,
+        public async Task<(string Response, HttpStatusCode StatusCode)> HttpPostWithX509Async(string url, Dictionary<string, string> parameters,
             string contentType, Dictionary<string, string> headers = null, X509Certificate2 certificate = null)
         {
             LogContext.PushProperty("url", url);
@@ -340,7 +340,7 @@ namespace ThirdPartyTool.Core.Helpers
                 var response = await client.PostAsync(url, formData);
                 var sb = response.Content.ReadAsStringAsync().Result;
                 _logger.LogInformation($"response: {sb}");
-                return sb;
+                return (sb, response.StatusCode);
             }
             catch (AggregateException ae)
             {
@@ -348,7 +348,7 @@ namespace ThirdPartyTool.Core.Helpers
                 {
                     _logger.LogError(ex, ex.Message);
                 }
-                return ae.Message;
+                return ($"AggregateException：{ae.Message}", HttpStatusCode.InternalServerError);
             }
             catch (HttpRequestException ex)
             {
@@ -356,12 +356,12 @@ namespace ThirdPartyTool.Core.Helpers
                 {
                     _logger.LogError(ex, ex.InnerException.Message);
                 }
-                return ex.Message;
+                return ($"HttpRequestException：{ex.Message}", HttpStatusCode.InternalServerError);
             }
             catch (Exception e)
             {
                 _logger.LogError(e, e.Message);
-                return e.Message;
+                return ($"Exception：{e.Message}", HttpStatusCode.InternalServerError);
             }
         }
     }
