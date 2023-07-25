@@ -399,7 +399,8 @@ namespace ThirdPartyTool.Core.ThirdParty
             if (CompareExtension.IsJson(result))
             {
                 var errorResp = JsonConvert.DeserializeObject<PTErrorResponse>(result);
-                errorResp = new PTErrorResponse() { error = "error test", errorcode = -1 };
+                //Test When Error Happen Will Write in Faild File
+                //errorResp = new PTErrorResponse() { error = "error test", errorcode = -1 };
                 if (!string.IsNullOrWhiteSpace(errorResp.error))
                 {
                     if (TransferPendingErrorCode.Contains(errorResp.errorcode))

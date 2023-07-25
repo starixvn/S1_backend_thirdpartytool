@@ -5,6 +5,7 @@ using System.IO;
 using System.Linq;
 using System.Net;
 using System.Net.Http;
+using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
 using System.Threading;
 using System.Threading.Tasks;
@@ -357,6 +358,14 @@ namespace ThirdPartyTool.Core.Helpers
                     _logger.LogError(ex, ex.InnerException.Message);
                 }
                 return ($"HttpRequestException：{ex.Message}", HttpStatusCode.InternalServerError);
+            }
+            catch(SocketException ex)
+            {
+                if (ex.InnerException != null)
+                {
+                    _logger.LogError(ex, ex.InnerException.Message);
+                }
+                return ($"SocketException：{ex.Message}", HttpStatusCode.InternalServerError);
             }
             catch (Exception e)
             {
