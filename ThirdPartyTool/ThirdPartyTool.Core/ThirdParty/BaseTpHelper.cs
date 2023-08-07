@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Newtonsoft.Json;
 using ThirdPartyTool.Core.DataLayers;
@@ -12,13 +13,16 @@ namespace ThirdPartyTool.Core.ThirdParty
 {
     public class BaseTpHelper
     {
+        private readonly IHostEnvironment env;
         protected readonly ILogger<BaseTpHelper> Logger;
         protected readonly IHttpHelper HttpHelper;
         protected readonly MainDbDataLayer MainDbDataLayer;
         protected readonly ReportDbDataLayer ReportDataLayer;
+        public static string ContentRootPath { set; get; }
 
         public BaseTpHelper(IServiceProvider provider)
         {
+            //env = provider.GetRequiredService<IHostEnvironment>();
             Logger = provider.GetRequiredService<ILogger<BaseTpHelper>>();
             HttpHelper = provider.GetRequiredService<IHttpHelper>();
             MainDbDataLayer = provider.GetRequiredService<MainDbDataLayer>();

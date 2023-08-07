@@ -66,6 +66,7 @@ namespace ThirdPartyTool.Core.DataLayers
             var parameter = new DynamicParameters();
             parameter.Add("_TpId", tpId);
             parameter.Add("_SiteId", siteId);
+            //如果要先撈非活躍用戶的話，要確認時間
             parameter.Add("_LastLoginTime", new DateTimeOffset(2023, 3, 1, 0, 0, 0,TimeSpan.Zero));
             var sql = @"
                 SELECT
