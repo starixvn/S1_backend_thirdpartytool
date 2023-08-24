@@ -10,7 +10,7 @@ namespace ThirdPartyTool.Core.Helpers.Interfaces
 {
     public interface IHttpHelper
     {
-        Task<(TResult Result, HttpStatusCode StatusCode)> GetAsync<TResult>(string url, string query)
+        Task<(string Result, HttpStatusCode StatusCode)> GetAsync<TResult>(string url, string query)
             where TResult : class;
 
         (TResult Result, HttpStatusCode StatusCode) Post<TBody, TResult>(string url, TBody body)

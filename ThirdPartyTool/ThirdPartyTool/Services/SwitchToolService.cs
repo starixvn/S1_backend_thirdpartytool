@@ -83,6 +83,7 @@ namespace ThirdPartyTool.Services
                 action = ParseActionType(strAction);
             };
             
+            Console.WriteLine("Mission Completed Bye Bye");
             return Task.CompletedTask;
         }
 
