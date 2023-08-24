@@ -7,6 +7,7 @@ using System.Net;
 using System.Net.Http;
 using System.Net.Sockets;
 using System.Security.Cryptography.X509Certificates;
+using System.Text;
 using System.Threading;
 using System.Threading.Tasks;
 using System.Xml.Linq;
@@ -38,18 +39,12 @@ namespace ThirdPartyTool.Core.Helpers
             _header = new Dictionary<string, string>();
         }
 
-        public async Task<(TResult Result, HttpStatusCode StatusCode)> GetAsync<TResult>(string url, string query)
+        public async Task<(string Result, HttpStatusCode StatusCode)> GetAsync<TResult>(string url, string query)
             where TResult : class
         {
-            var tResult = default(TResult);
-            var result = await GetDataAsync(url, query);
-
+            var (result,statusCode) = await GetDataAsync(url, query);
             _header.Clear();
-
-            if (result.StatusCode == HttpStatusCode.OK)
-                tResult = _serializer.DeserializeFormStream<TResult>(result.ContentStream);
-
-            return (tResult, result.StatusCode);
+            return (result, statusCode);
         }
 
         public (TResult Result, HttpStatusCode StatusCode) Post<TBody, TResult>(string url, TBody body)
@@ -283,29 +278,31 @@ namespace ThirdPartyTool.Core.Helpers
             return (Result: returnObj, response.ResponseMessage.StatusCode);
         }
 
-        private async Task<(Stream ContentStream, HttpStatusCode StatusCode)> GetDataAsync(string url, string query)
+        private async Task<(string Response, HttpStatusCode StatusCode)> GetDataAsync(string url, string query)
         {
             var sw = Stopwatch.StartNew();
             var urlWithQuery = $"{url}?{query}";
             var request = CreateFlurlRequest(urlWithQuery);
             request = _header.Aggregate(request, (current, item)
                 => current.WithHeader(item.Key, item.Value));
-
+            
             if (request.Headers.Any())
             {
                 _logger.LogInformation("Headers:"
-                    + JsonConvert.SerializeObject(request.Headers.ToDictionary(x => x.Name, x => x.Value)));
+                                       + JsonConvert.SerializeObject(request.Headers.ToDictionary(x => x.Name, x => x.Value)));
             }
-
+            
             var response = await request.GetAsync();
+            var stream = response.GetStreamAsync();
             _header.Clear();
-
+            
             LogContext.PushProperty("elapsed", sw.Elapsed.TotalMilliseconds);
             LogContext.PushProperty("url", urlWithQuery);
-            _logger.LogInformation(await response.ResponseMessage.Content.ReadAsStringAsync());
-            var stream = response.ResponseMessage.Content.ReadAsStreamAsync();
-
-            return (await stream, response.ResponseMessage.StatusCode);
+        
+            using var myStreamReader = new StreamReader(stream.Result, Encoding.GetEncoding("UTF-8"));
+            var responseS = myStreamReader.ReadToEndAsync();
+            
+            return (await responseS, response.ResponseMessage.StatusCode);
         }
 
         public async Task<(string Response, HttpStatusCode StatusCode)> HttpPostWithX509Async(string url, Dictionary<string, string> parameters,
