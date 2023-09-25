@@ -57,36 +57,20 @@ namespace ThirdPartyTool.Core.ThirdParty
         {
             var failedList = new List<TransferBackFailedRecord>();
             var remainList = new List<TransferRemainRecord>();
-            List<UserBalance> tpBalanceInfoList;
-            
-            // Step 1: 取得餘額
-            try
-            {
-                tpBalanceInfoList = CheckUserBalanceAsync(todoList).Result.ToList();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, ex.Message);
-                failedList = todoList
-                    .Select(x => new TransferBackFailedRecord(x.CustId, string.Empty, "Get V8 user balance failed."))
-                    .ToList();
-            
-                return (failedList, remainList);
-            }
             
             Parallel.ForEach(todoList,
                 new ParallelOptions { MaxDegreeOfParallelism = taskCount },
                 tpCustInfo =>
                 {
+                    // Step 1: 取得餘額
+                    var tpBalanceInfo = CheckUserBalanceAsync(tpCustInfo).Result;
                     var transId = string.Empty;
                     try
                     {
-                        var tpBalanceInfo = tpBalanceInfoList.FirstOrDefault(x => x.TpUserName == tpCustInfo.TpUserName);
-            
                         if (tpBalanceInfo == null)
                             throw new CustomException($"{tpCustInfo.CustId} {tpCustInfo.TpUserName} TP balance info is null.");
             
-                        if (tpBalanceInfo.balance <= 0 || tpCustInfo.IsTest)
+                        if (tpBalanceInfo.balance <= (decimal)0.33 || tpCustInfo.IsTest)
                             return;
             
                         // Step 2: 轉回餘額
@@ -98,7 +82,7 @@ namespace ThirdPartyTool.Core.ThirdParty
                         var (status,resp,thirdId) = FundTransferAsync(tpCustInfo, tpTransferInfo, transId).Result;
             
                         // 有殘餘轉不乾淨的金額
-                        if (resp.d.money > 0)
+                        if (resp.d.money > (decimal)0.33)
                             remainList.Add(new TransferRemainRecord(tpCustInfo, resp.d.money));
             
                         // 轉帳失敗不 Commit，Retry 檢查單號的時候再做
@@ -327,6 +311,51 @@ namespace ThirdPartyTool.Core.ThirdParty
             return balanceInfoList;
         }
         
+        private async Task<UserBalance> CheckUserBalanceAsync(TpCustInfoModel custInfo)
+        {
+            var tpSetting = GetThirdPartyModel(custInfo.SiteId).TpSetting;
+            var apiUrl = tpSetting.ContainsKey("ApiUrl") && !string.IsNullOrEmpty(tpSetting["ApiUrl"]) ? tpSetting["ApiUrl"] : throw new Exception("ApiUrl");
+            var agent = tpSetting.ContainsKey("Agent") && !string.IsNullOrEmpty(tpSetting["Agent"]) ? tpSetting["Agent"] : throw new Exception("Agent");
+            var desKey = tpSetting.ContainsKey("Deskey") && !string.IsNullOrEmpty(tpSetting["Deskey"]) ? tpSetting["Deskey"] : throw new Exception("Deskey");
+            var md5Key = tpSetting.ContainsKey("Md5key") && !string.IsNullOrEmpty(tpSetting["Md5key"]) ? tpSetting["Md5key"] : throw new Exception("Md5key");
+            
+            var current = new DateTimeOffset(DateTime.UtcNow);
+            var timestamp = current.ToUnixTimeMilliseconds();
+
+            var param = new
+            {
+                s = 7,
+                account = custInfo.TpUserName,
+            };
+            var dicP = JsonConvertExtension.FromJson<Dictionary<string, string>>(JsonConvertExtension.ToJson(param));
+            var sParam = string.Join("&", dicP.Where(x => x.Value != null).Select(kp => $"{kp.Key}={kp.Value}").ToArray());
+
+            var balance = new
+            {
+                agent,
+                timestamp,
+                param = CommonExtension.AesEncrypt(sParam, desKey),
+                key = CommonExtension.ToMD5($"{agent}{timestamp}{md5Key}").ToLower()
+            };
+            dicP = JsonConvertExtension.FromJson<Dictionary<string, string>>(JsonConvertExtension.ToJson(balance));
+            var sBalance = string.Join("&", dicP.Where(x => x.Value != null).Select(kp => $"{kp.Key}={kp.Value}").ToArray());
+                    
+            var result = await HttpHelper.GetAsync<string>(apiUrl, sBalance);
+            var response = result.Result;
+            if (CompareExtension.IsJson(response))
+            {
+                var oApiResult = new UserBalance();
+                var json = JsonConvert.DeserializeObject<ApiResponse>(response);
+                if (json.d.code == 0)
+                {
+                    oApiResult.TpUserName = custInfo.TpUserName;
+                    oApiResult.balance = json.d.freeMoney; // 可下分余额
+                    return oApiResult;
+                }
+            }
+
+            return null;
+        }
         private async Task<(TransferStatus Status, ApiResponse json , string orderid)> FundTransferAsync(TpCustInfoModel tpCustInfo, TpTransferInfoModel tpTransferInfo, string transId)
         {
             var tpSetting = GetThirdPartyModel(tpCustInfo.SiteId).TpSetting;
