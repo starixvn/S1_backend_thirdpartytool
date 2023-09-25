@@ -119,25 +119,8 @@ namespace ThirdPartyTool.Core.ThirdParty
         public (IEnumerable<TransferBackFailedRecord> FailedRecords, IEnumerable<TransferRemainRecord> RemainRecords) ParallelTransferRetry(
             IEnumerable<TransferBackRetryModel> todoList, int taskCount)
         {
-             var failedList = new List<TransferBackFailedRecord>();
+            var failedList = new List<TransferBackFailedRecord>();
             var remainList = new List<TransferRemainRecord>();
-            List<UserBalance> tpBalanceInfoList;
-            
-            // Step 1: 取得餘額
-            try
-            {
-                var tpCustInfoList = todoList.Select(cust => cust.TpCustInfo).ToList();
-                tpBalanceInfoList = CheckUserBalanceAsync(tpCustInfoList).Result.ToList();
-            }
-            catch (Exception ex)
-            {
-                Logger.LogError(ex, ex.Message);
-                failedList = todoList
-                    .Select(x => new TransferBackFailedRecord(x.CustId, string.Empty, "Get V8 user balance failed."))
-                    .ToList();
-            
-                return (failedList, remainList);
-            }
             
             Parallel.ForEach(todoList,
                 new ParallelOptions { MaxDegreeOfParallelism = taskCount },
@@ -147,12 +130,13 @@ namespace ThirdPartyTool.Core.ThirdParty
                     var tpCustInfo = Retry.TpCustInfo;
                     try
                     {
-                        var tpBalanceInfo = tpBalanceInfoList.FirstOrDefault(x => x.TpUserName == tpCustInfo.TpUserName);
-            
+                        // Step 1: 取得餘額
+                        var tpBalanceInfo = CheckUserBalanceAsync(tpCustInfo).Result;
+                        
                         if (tpBalanceInfo == null)
                             throw new CustomException($"{tpCustInfo.CustId} {tpCustInfo.TpUserName} TP balance info is null.");
             
-                        if (tpBalanceInfo.balance <= 0 || tpCustInfo.IsTest)
+                        if (tpBalanceInfo.balance <= (decimal)0.33 || tpCustInfo.IsTest)
                             return;
             
                         // Step 2: 轉回餘額
@@ -164,7 +148,7 @@ namespace ThirdPartyTool.Core.ThirdParty
                         var (status,resp,thirdId) = FundTransferAsync(tpCustInfo, tpTransferInfo, transId).Result;
             
                         // 有殘餘轉不乾淨的金額
-                        if (resp.d.money > 0)
+                        if (resp.d.money > (decimal)0.33)
                             remainList.Add(new TransferRemainRecord(tpCustInfo, resp.d.money));
             
                         // 轉帳失敗不 Commit，Retry 檢查單號的時候再做
