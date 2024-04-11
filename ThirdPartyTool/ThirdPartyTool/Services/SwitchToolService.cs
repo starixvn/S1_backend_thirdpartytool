@@ -73,6 +73,11 @@ namespace ThirdPartyTool.Services
                     case ActionType.TransferRetry:
                         TransferRetry(tpId);
                         break;
+                    
+                    case ActionType.BatchDoProcedure:
+                        BatchDoProcedure();
+                        break;
+                    
                     default:
                         Console.WriteLine("Do not support: " + strAction);
                         break;
@@ -104,7 +109,6 @@ namespace ThirdPartyTool.Services
                     break;
                 case "2":
                     ProcessSpecialList(action, tpId);
-                    
                     break;
             }
         }
@@ -255,6 +259,33 @@ namespace ThirdPartyTool.Services
                 AppendToFileEnd(fileName, str);
             }
         }
+        
+        private void BatchDoProcedure() //IEnumerable<int> custList
+        {
+            var strCustIds = ReadStringFromInputFilePath();
+            var custIdList = GetSplitList(strCustIds);
+            
+            Console.WriteLine("Enter the sp name:");
+            var spName = Console.ReadLine();
+            
+            foreach (var cust in custIdList)
+                Console.WriteLine($"\tCustId={cust}");
+            
+            Console.WriteLine($"Confirm to run procedure={spName} for above customer");
+       
+            if (!Confirm())
+                return;
+            
+            var result = _baseTpHelper.BatchDoProcedure(custIdList, spName);
+
+            var fileName = $"{spName}_{_yyyyMMddHHmm}.txt";
+            var str = string.Join(Environment.NewLine,
+                result.Select(x => $"{x.CustId}|{x.Result}"));
+
+            AppendToFileEnd(fileName, str);
+            
+            Console.WriteLine("Finished.");
+        }
 
         private void TransferRetry(int tpId)
         {
@@ -394,7 +425,7 @@ namespace ThirdPartyTool.Services
             var strTpId = Console.ReadLine();
             int tpId;
 
-            while (!int.TryParse(strTpId, out tpId) || !_tpHandler.ContainsKey(tpId))
+            while (!int.TryParse(strTpId, out tpId) || (!_tpHandler.ContainsKey(tpId) && tpId != 0))
             {
                 Console.WriteLine("TpId not support, enter the TpId:");
                 strTpId = Console.ReadLine();

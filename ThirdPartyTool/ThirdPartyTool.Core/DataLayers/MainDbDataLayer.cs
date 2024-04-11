@@ -1,7 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Data;
-using System.Linq;
+﻿using System.Data;
 using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using MySql.Data.MySqlClient;
@@ -87,6 +84,14 @@ namespace ThirdPartyTool.Core.DataLayers
             parameter.Add("CustId", custId);
 
             return _dbClient.Execute("Service_SabaBonus_Adjust_V2", trans, parameter);
+        }
+        
+        public int DoProcedure(int custId, string spName)
+        {
+            var parameter = new DynamicParameters();
+            parameter.Add("CustId", custId);
+
+            return _dbClient.Execute(spName, parameter);
         }
         
         public MySqlConnection GetMySqlConnection()
