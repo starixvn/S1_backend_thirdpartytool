@@ -126,6 +126,28 @@ namespace ThirdPartyTool.Core.DataLayers
             _logger.LogDebug($"{name} {sw.Elapsed:c}");
             return result;
         }
+        
+        public int Execute(string name, object parameters = null)
+        {
+            var sw = Stopwatch.StartNew();
+            try
+            {
+                using var connection = new MySqlConnection(_connectionString);
+                var result = connection.Execute(name, parameters, commandType: CommandType.StoredProcedure);
+                connection.Close();
+                connection.Dispose();
+
+                LogContext.PushProperty("ElapsedMilliseconds", sw.Elapsed.TotalMilliseconds);
+                _logger.LogDebug($"{name} {sw.Elapsed:c}");
+                
+                return result;
+            }
+            catch (Exception e)
+            {
+                _logger.LogError(e, name);
+                throw;
+            }
+        }
 
         public int Execute(string name, IDbTransaction trans, object parameters = null)
         {

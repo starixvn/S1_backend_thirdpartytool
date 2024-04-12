@@ -19,6 +19,9 @@ namespace ThirdPartyTool.Core.Models.Enums
         [Description("Adjust bonus")]
         AdjustBonus = 5,
 
+        [Description("Batch do procedure")]
+        BatchDoProcedure = 6,
+        
         [Description("Exit")]
         Exit = -1,
 

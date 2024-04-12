@@ -43,6 +43,30 @@ namespace ThirdPartyTool.Core.ThirdParty
         {
             return ReportDataLayer.GetTpAllCustInfoByCust(tpId, jsonCustIds);
         }
+        
+        public IEnumerable<BatchDoResult> BatchDoProcedure(IEnumerable<string> custIds, string spName)
+        {
+            var resultList = new List<BatchDoResult>();
+            
+            foreach (var strCustId in custIds)
+            {
+                try
+                {
+                    Console.WriteLine($"CustId={strCustId} processing...");
+                    var custId = int.Parse(strCustId);
+                    var result = MainDbDataLayer.DoProcedure(custId, spName);
+                    
+                    resultList.Add(new BatchDoResult(strCustId, result));
+                }
+                catch (Exception ex)
+                {
+                    Logger.LogError(ex, $"custId={strCustId} do {spName} exception");
+                    resultList.Add(new BatchDoResult(strCustId, -99));
+                }
+            }
+            
+            return resultList;
+        }
 
         public string CreateTpTransferInfo(TpTransferInfoModel tpTransferInfo)
         {
