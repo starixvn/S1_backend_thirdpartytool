@@ -89,7 +89,7 @@ namespace ThirdPartyTool.Core.DataLayers
         public int DoProcedure(int custId, string spName)
         {
             var parameter = new DynamicParameters();
-            parameter.Add("CustId", custId);
+            parameter.Add("_CustId", custId);
 
             return _dbClient.Execute(spName, parameter);
         }
