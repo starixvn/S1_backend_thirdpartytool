@@ -41,6 +41,6 @@ internal class Program
     {
         const int batchCnt = 3000;
 
-        _ = service.SetFlowEndTime(batchCnt, 2000, -1);
+        _ = service.SetFlowEndTime(batchCnt, 0, -1);
     }
 }

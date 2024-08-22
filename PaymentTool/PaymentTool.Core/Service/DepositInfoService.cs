@@ -63,4 +63,14 @@ public class DepositInfoService
             
         return await _mainDbClient.ExecuteAsync("Tool_CustTaskTime_1StDeposit_Set", parameter) > 0;
     }
+    
+    public async Task<bool> BatchSet1stDepositInfo(IEnumerable<int> ids)
+    {
+        var parameter = new DynamicParameters(new
+        {
+            _Ids = JsonConvert.SerializeObject(ids)
+        });
+            
+        return await _mainDbClient.ExecuteAsync("Tool_Batch_1stDepositInfo_Set", parameter) > 0;
+    }
 }
