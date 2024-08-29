@@ -172,6 +172,7 @@ public class DepositService
     {
         var failedCnt = 0;
         var custIds = (await _depositService.GetLost1stDepositCustIds()).ToList();
+        
         var index = 0;
         var endIndex = (int)Math.Ceiling(custIds.Count / (decimal)limit);
         
@@ -187,31 +188,45 @@ public class DepositService
                     break;
             
                 var custTaskInfos = new List<CustTaskTimeInfo>();
-                var firstDepositIds = new List<int>();
+                var firstDepositInfos = new List<FirstDepositInfo>();
 
-                var data = logs.GroupBy(x => (x.CustId, x.DepositId));
+                var data = logs.GroupBy(x => x.CustId);
 
                 foreach (var g in data)
                 {
-                    var depositInfo = g
-                        .Where(x => x.Status == DepositStatusEnum.Approved)
+                    var fstDepositInfo = g
+                        .Where(x => x.Status == DepositStatusEnum.Approved
+                                    && x.Action == DepositStatusEnum.Approved)
                         .MinBy(x => x.FlowEndTime);
                     
-                    if (depositInfo == null)
+                    /*var tmpDepositInfos = g.Select(x =>
+                        new FirstDepositInfo
+                        {
+                            DepositId = x.DepositId,
+                            FirstDeposit = x.DepositId == fstDepositInfo?.DepositId
+                        });
+
+                    firstDepositInfos.AddRange(tmpDepositInfos);*/
+                    
+                    if (fstDepositInfo == null)
                         continue;
                     
                     custTaskInfos.Add(new CustTaskTimeInfo
                     {
-                        CustId = g.Key.CustId,
-                        TaskTime = depositInfo.FlowEndTime.DateTime
+                        CustId = g.Key,
+                        TaskTime = fstDepositInfo.FlowEndTime.DateTime
                     });
-
-                    firstDepositIds.Add(depositInfo.DepositId);
+                    
+                    firstDepositInfos.Add(new FirstDepositInfo
+                    {
+                        DepositId = fstDepositInfo.DepositId,
+                        FirstDeposit = true
+                    });
                 }
 
-                if (!await _depositService.BatchSet1stDepositInfo(firstDepositIds))
+                if (!await _depositService.BatchSet1stDepositInfo(firstDepositInfos))
                 {
-                    var str = $"index={index}, limit={limit}, data={JsonConvert.SerializeObject(firstDepositIds)}";
+                    var str = $"index={index}, limit={limit}, data={JsonConvert.SerializeObject(firstDepositInfos)}";
 
                     _logger.LogInformation("BatchSet1stDeposit update return=0, " + str);
                     AppendToFileEnd($"Set1stDepositFailed_{_yyyyMMddHHmm}.txt", str + Environment.NewLine);
