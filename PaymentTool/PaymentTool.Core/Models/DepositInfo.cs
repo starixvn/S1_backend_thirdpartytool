@@ -7,6 +7,7 @@ public class DepositInfo
     private DateTimeOffset _createTime { get; set; }
     private DateTimeOffset _updateTime { get; set; }
     private DateTimeOffset _flowEndTime { get; set; }
+    private DateTimeOffset _statementTime { get; set; }
     private DateTimeOffset? _depositTime { get; set; }
     private DateTimeOffset? _callbackTime { get; set; }
     private DateTimeOffset? _logTime { get; set; }
@@ -29,6 +30,11 @@ public class DepositInfo
     {
         get => _flowEndTime;
         set => _flowEndTime = new DateTimeOffset(value.DateTime, TimeSpan.Zero);
+    }
+    public DateTimeOffset StatementTime
+    {
+        get => _statementTime;
+        set => _statementTime = new DateTimeOffset(value.DateTime, TimeSpan.Zero);
     }
     public DateTimeOffset? DepositTime
     {
