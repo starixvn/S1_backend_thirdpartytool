@@ -29,6 +29,17 @@ public class DepositInfoService
         return await _reportDbClient.QueryAsync<DepositInfo>("Tool_DepositInfo_Get", parameter);
     }
     
+    public async Task<IEnumerable<DepositInfo>> Get1stDepositInfos(int index, int limit)
+    {
+        var parameter = new DynamicParameters(new
+        {
+            _StartIndex = index,
+            _Limit = limit
+        });
+            
+        return await _reportDbClient.QueryAsync<DepositInfo>("Tool_CustTaskTime_1stDeposit_Get", parameter);
+    }
+    
     public async Task<IEnumerable<int>> GetLost1stDepositCustIds()
     {
         return await _reportDbClient.QueryAsync<int>("Tool_Lost1stDepositCust_Get");
@@ -52,6 +63,16 @@ public class DepositInfoService
         });
             
         return await _mainDbClient.ExecuteAsync("Tool_Batch_DepositInfo_Set", parameter) > 0;
+    }
+    
+    public async Task<bool> BatchSet1stTransId(IEnumerable<CustTaskTimeInfo> infos)
+    {
+        var parameter = new DynamicParameters(new
+        {
+            _Infos = JsonConvert.SerializeObject(infos)
+        });
+            
+        return await _mainDbClient.ExecuteAsync("Tool_CustTaskTime_1stDepositId_Set", parameter) > 0;
     }
     
     public async Task<bool> BatchSetCustTaskTime(IEnumerable<CustTaskTimeInfo> infos)

@@ -11,6 +11,7 @@ public class DepositInfo
     private DateTimeOffset? _depositTime { get; set; }
     private DateTimeOffset? _callbackTime { get; set; }
     private DateTimeOffset? _logTime { get; set; }
+    private DateTimeOffset? _taskTime { get; set; }
     
     public string TransId { get; set; }
     public int DepositId { get; set; }
@@ -54,6 +55,12 @@ public class DepositInfo
     {
         get => _logTime;
         set => _logTime = value == null ? null :
+            new DateTimeOffset(value.Value.DateTime, TimeSpan.Zero);
+    }
+    public DateTimeOffset? TaskTime
+    {
+        get => _taskTime;
+        set => _taskTime = value == null ? null :
             new DateTimeOffset(value.Value.DateTime, TimeSpan.Zero);
     }
 }

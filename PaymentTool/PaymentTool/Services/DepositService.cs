@@ -35,11 +35,11 @@ public class DepositService
     
     public async Task<bool> Set1stDepositTransId(int limit, int startIndex, int endIndex)
     {
-        _logger.LogInformation($"{DateTime.Now:HH:mm:ss} || SetFlowEndTime Start SetAll, limit={limit}, startIndex={startIndex}, endIndex={endIndex}");
+        _logger.LogInformation($"{DateTime.Now:HH:mm:ss} || Set1stDepositTransId Start SetAll, limit={limit}, startIndex={startIndex}, endIndex={endIndex}");
 
-        var failedCnt = await DoSetAll(limit, startIndex, endIndex);
+        var failedCnt = await DoSetAll1stTransId(limit, startIndex, endIndex);
         
-        _logger.LogInformation($"{DateTime.Now:HH:mm:ss} || SetFlowEndTime End, failed count={failedCnt}");
+        _logger.LogInformation($"{DateTime.Now:HH:mm:ss} || Set1stDepositTransId End, failed count={failedCnt}");
 
         return true;
     }
@@ -94,6 +94,67 @@ public class DepositService
             using var sw = File.AppendText(fullPath);
             sw.Write(str);
         }
+    }
+
+    private async Task<int> DoSetAll1stTransId(int limit, int startIndex, int endIndex)
+    {
+        var failedCnt = 0;
+        var index = startIndex;
+        var maxId = index;
+
+        while (true)
+        {
+            Console.WriteLine($"index => {index}");
+            try
+            {
+                var infos = await _depositService.Get1stDepositInfos(index, limit);
+
+                maxId = infos.Max(x => x.CustId);
+                
+                if (index == maxId)
+                    break;
+                
+                var custTaskInfos = new List<CustTaskTimeInfo>();
+
+                var data = infos.GroupBy(x => x.CustId);
+
+                foreach (var depositInfos in data)
+                {
+                    var depositInfo = depositInfos.FirstOrDefault(x => x.FlowEndTime == x.TaskTime);
+                    
+                    if (depositInfo == null)
+                    {
+                        depositInfo = depositInfos.OrderBy(x => x.FlowEndTime).First();
+                    }
+
+                    custTaskInfos.Add(new CustTaskTimeInfo
+                    {
+                        CustId = depositInfo.CustId,
+                        RefId = depositInfo.TransId
+                    });
+                }
+
+                if (!await _depositService.BatchSet1stTransId(custTaskInfos))
+                {
+                    var str = $"index={index}, maxId={maxId}, limit={limit}, data={JsonConvert.SerializeObject(custTaskInfos)}";
+
+                    _logger.LogInformation("BatchSetFlowEndTime update return=0, " + str);
+                    AppendToFileEnd($"Set1stTransIdFailed_{_yyyyMMddHHmm}.txt", str + Environment.NewLine);
+                }
+            }
+            catch (Exception e)
+            {
+                AppendToFileEnd($"Exception_{_yyyyMMddHHmm}.txt", $"index={index}, maxId={maxId}, limit={limit}, exception={e}" + Environment.NewLine);
+                failedCnt++;
+            }
+
+            index = maxId;
+            
+            if (endIndex != -1 && index >= endIndex)
+                break;
+        }
+
+        return failedCnt;
     }
 
     private async Task<int> DoSetAll(int limit, int startIndex, int endIndex)
