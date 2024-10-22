@@ -96,25 +96,22 @@ public class DepositService
         }
     }
 
-    private async Task<int> DoSetAll1stTransId(int limit, int startIndex, int endIndex)
+    private async Task<int> DoSetAll1stTransId(int pageSize, int startIndex, int endIndex)
     {
         var failedCnt = 0;
         var index = startIndex;
-        var maxId = index;
+        var page = 0;
+        var totalCnt = 0;
 
         while (true)
         {
-            Console.WriteLine($"index => {index}");
             try
             {
-                var infos = await _depositService.Get1stDepositInfos(index, limit);
-
-                maxId = infos.Max(x => x.CustId);
-                
-                if (index == maxId)
-                    break;
-                
+                index = page * pageSize;
+                var (infos, rowCnt) = await _depositService.Get1stDepositInfos(index, pageSize);
+                totalCnt = rowCnt;
                 var custTaskInfos = new List<CustTaskTimeInfo>();
+                Console.WriteLine($"index={index}, page={page}");
 
                 var data = infos.GroupBy(x => x.CustId);
 
@@ -136,7 +133,7 @@ public class DepositService
 
                 if (!await _depositService.BatchSet1stTransId(custTaskInfos))
                 {
-                    var str = $"index={index}, maxId={maxId}, limit={limit}, data={JsonConvert.SerializeObject(custTaskInfos)}";
+                    var str = $"index={index}, limit={pageSize}, data={JsonConvert.SerializeObject(custTaskInfos)}";
 
                     _logger.LogInformation("BatchSetFlowEndTime update return=0, " + str);
                     AppendToFileEnd($"Set1stTransIdFailed_{_yyyyMMddHHmm}.txt", str + Environment.NewLine);
@@ -144,14 +141,14 @@ public class DepositService
             }
             catch (Exception e)
             {
-                AppendToFileEnd($"Exception_{_yyyyMMddHHmm}.txt", $"index={index}, maxId={maxId}, limit={limit}, exception={e}" + Environment.NewLine);
+                AppendToFileEnd($"Exception_{_yyyyMMddHHmm}.txt", $"index={index}, limit={pageSize}, exception={e}" + Environment.NewLine);
                 failedCnt++;
             }
 
-            index = maxId;
-            
-            if (endIndex != -1 && index >= endIndex)
+            if (index > totalCnt)
                 break;
+            
+            page++;
         }
 
         return failedCnt;

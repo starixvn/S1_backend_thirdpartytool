@@ -1,3 +1,4 @@
+using System.Data;
 using Dapper;
 using Microsoft.Extensions.DependencyInjection;
 using Newtonsoft.Json;
@@ -29,15 +30,19 @@ public class DepositInfoService
         return await _reportDbClient.QueryAsync<DepositInfo>("Tool_DepositInfo_Get", parameter);
     }
     
-    public async Task<IEnumerable<DepositInfo>> Get1stDepositInfos(int index, int limit)
+    public async Task<(IEnumerable<DepositInfo>, int)> Get1stDepositInfos(int index, int limit)
     {
         var parameter = new DynamicParameters(new
         {
             _StartIndex = index,
-            _Limit = limit
+            _PageSize = limit
         });
-            
-        return await _reportDbClient.QueryAsync<DepositInfo>("Tool_CustTaskTime_1stDeposit_Get", parameter);
+        
+        parameter.Add("_RowCount", dbType: DbType.Int32, direction: ParameterDirection.Output);
+        var result = await _reportDbClient.QueryAsync<DepositInfo>("Tool_CustTaskTime_1stDeposit_Get", parameter);
+        var rowCnt = parameter.Get<int?>("_RowCount") ?? 0;
+        
+        return (result, rowCnt);
     }
     
     public async Task<IEnumerable<int>> GetLost1stDepositCustIds()
