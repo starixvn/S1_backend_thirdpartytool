@@ -40,7 +40,7 @@ internal class Program
     private static void SetFlowEndTime(DepositService service)
     {
         const int batchCnt = 3000;
-
         _ = service.SetFlowEndTime(batchCnt, 0, -1);
+        //_ = service.Set1stDepositTransId(batchCnt, 0, -1);
     }
 }

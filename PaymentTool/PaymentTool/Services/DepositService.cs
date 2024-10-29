@@ -24,15 +24,26 @@ public class DepositService
 
     public async Task<bool> SetFlowEndTime(int limit, int startIndex, int endIndex)
     {
-        _logger.LogInformation($"{DateTime.Now:HH:mm:ss} || SetFlowEndTime Start SetAll, limit={limit}, startIndex={startIndex}, endIndex={endIndex}");
+        _logger.LogInformation($"{DateTime.Now:HH:mm:ss} || SetAll Start, limit={limit}, startIndex={startIndex}, endIndex={endIndex}");
 
         var failedCnt = await DoSetAll(limit, startIndex, endIndex);
         
-        _logger.LogInformation($"{DateTime.Now:HH:mm:ss} || SetFlowEndTime Start SetLost1stDeposit");
-
-        failedCnt += await DoSetLost1StDeposit(limit);
+        _logger.LogInformation($"{DateTime.Now:HH:mm:ss} || SetAll End, failed count={failedCnt}");
         
-        _logger.LogInformation($"{DateTime.Now:HH:mm:ss} || SetFlowEndTime End, failed count={failedCnt}");
+        failedCnt = await DoSetLost1StDeposit(limit);
+        
+        _logger.LogInformation($"{DateTime.Now:HH:mm:ss} || SetLost1StDeposit End, failed count={failedCnt}");
+
+        return true;
+    }
+    
+    public async Task<bool> Set1stDepositTransId(int limit, int startIndex, int endIndex)
+    {
+        _logger.LogInformation($"{DateTime.Now:HH:mm:ss} || Set1stDepositTransId Start SetAll, limit={limit}, startIndex={startIndex}, endIndex={endIndex}");
+
+        var failedCnt = await DoSetAll1stTransId(limit, startIndex, endIndex);
+        
+        _logger.LogInformation($"{DateTime.Now:HH:mm:ss} || Set1stDepositTransId End, failed count={failedCnt}");
 
         return true;
     }
@@ -41,6 +52,9 @@ public class DepositService
     {
         var depositInfo = depositInfos.First();
 
+        if (depositInfos.GroupBy(x=> x.Action).Count() == 1)
+            return depositInfo.StatementTime;
+        
         return depositInfo.Status switch
         {
             DepositStatusEnum.Rejected or DepositStatusEnum.Approved
@@ -61,12 +75,6 @@ public class DepositService
 
         if (time.HasValue)
             return time.Value;
-        
-        if (depositInfo.DepositTime.HasValue)
-            return depositInfo.DepositTime.Value;
-        
-        if (depositInfo.CallbackTime.HasValue)
-            return depositInfo.CallbackTime.Value;
 
         return depositInfo.UpdateTime;
     }
@@ -84,6 +92,64 @@ public class DepositService
             using var sw = File.AppendText(fullPath);
             sw.Write(str);
         }
+    }
+
+    private async Task<int> DoSetAll1stTransId(int pageSize, int startIndex, int endIndex)
+    {
+        var failedCnt = 0;
+        var index = startIndex;
+        var page = 0;
+        var totalCnt = 0;
+
+        while (true)
+        {
+            try
+            {
+                index = page * pageSize;
+                var (infos, rowCnt) = await _depositService.Get1stDepositInfos(index, pageSize);
+                totalCnt = rowCnt;
+                var custTaskInfos = new List<CustTaskTimeInfo>();
+                Console.WriteLine($"index={index}, page={page}");
+
+                var data = infos.GroupBy(x => x.CustId);
+
+                foreach (var depositInfos in data)
+                {
+                    var depositInfo = depositInfos.FirstOrDefault(x => x.FlowEndTime == x.TaskTime);
+                    
+                    if (depositInfo == null)
+                    {
+                        depositInfo = depositInfos.OrderBy(x => x.FlowEndTime).First();
+                    }
+
+                    custTaskInfos.Add(new CustTaskTimeInfo
+                    {
+                        CustId = depositInfo.CustId,
+                        RefId = depositInfo.TransId
+                    });
+                }
+
+                if (!await _depositService.BatchSet1stTransId(custTaskInfos))
+                {
+                    var str = $"index={index}, limit={pageSize}, data={JsonConvert.SerializeObject(custTaskInfos)}";
+
+                    _logger.LogInformation("BatchSetFlowEndTime update return=0, " + str);
+                    AppendToFileEnd($"Set1stTransIdFailed_{_yyyyMMddHHmm}.txt", str + Environment.NewLine);
+                }
+            }
+            catch (Exception e)
+            {
+                AppendToFileEnd($"Exception_{_yyyyMMddHHmm}.txt", $"index={index}, limit={pageSize}, exception={e}" + Environment.NewLine);
+                failedCnt++;
+            }
+
+            if (index > totalCnt)
+                break;
+            
+            page++;
+        }
+
+        return failedCnt;
     }
 
     private async Task<int> DoSetAll(int limit, int startIndex, int endIndex)
@@ -110,7 +176,9 @@ public class DepositService
                 var flowEndTimeInfos = new List<FlowEndTimeInfo>();
                 var custTaskInfos = new List<CustTaskTimeInfo>();
 
-                var data = logs.GroupBy(x => x.DepositId);
+                var data = logs
+                    .Where(x => x.Status is DepositStatusEnum.Approved or DepositStatusEnum.Canceled or DepositStatusEnum.Rejected)
+                    .GroupBy(x => x.DepositId);
 
                 foreach (var depositInfos in data)
                 {
@@ -128,7 +196,8 @@ public class DepositService
                         custTaskInfos.Add(new CustTaskTimeInfo
                         {
                             CustId = depositInfo.CustId,
-                            TaskTime = flowEndTime.DateTime
+                            TaskTime = flowEndTime.DateTime,
+                            RefId = depositInfo.TransId
                         });
                     }
 
@@ -195,18 +264,16 @@ public class DepositService
                 foreach (var g in data)
                 {
                     var fstDepositInfo = g
-                        .Where(x => x.Status == DepositStatusEnum.Approved
-                                    && x.Action == DepositStatusEnum.Approved)
-                        .MinBy(x => x.FlowEndTime);
+                        .FirstOrDefault(x => x.FirstDeposit);
                     
-                    /*var tmpDepositInfos = g.Select(x =>
+                    var tmpDepositInfos = g.Select(x =>
                         new FirstDepositInfo
                         {
                             DepositId = x.DepositId,
                             FirstDeposit = x.DepositId == fstDepositInfo?.DepositId
                         });
 
-                    firstDepositInfos.AddRange(tmpDepositInfos);*/
+                    firstDepositInfos.AddRange(tmpDepositInfos);
                     
                     if (fstDepositInfo == null)
                         continue;
@@ -214,7 +281,8 @@ public class DepositService
                     custTaskInfos.Add(new CustTaskTimeInfo
                     {
                         CustId = g.Key,
-                        TaskTime = fstDepositInfo.FlowEndTime.DateTime
+                        TaskTime = fstDepositInfo.FlowEndTime.DateTime,
+                        RefId = fstDepositInfo.TransId
                     });
                     
                     firstDepositInfos.Add(new FirstDepositInfo
